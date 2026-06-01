@@ -1,3 +1,5 @@
+*다른 언어로 읽기: [English](README.md), [한국어](README.ko.md)*
+
 # ⚡ SwiftDeck: FinOps & Office Workflow Automation Suite
 A Professional Productivity Command Center for Finance Managers & Business Professionals (Built with AutoHotkey v2)
 
