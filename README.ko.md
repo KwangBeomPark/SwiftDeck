@@ -1,21 +1,24 @@
 *다른 언어로 읽기: [English](README.md), [한국어](README.ko.md)*
 
-# ⚡ SwiftDeck: FinOps & Office Workflow Automation Suite
+# ⚡ SwiftDeck: 재무 실무 기반 오피스 자동화 도구 모음
 A Professional Productivity Command Center for Finance Managers & Business Professionals (Built with AutoHotkey v2)
 
 <p align="center">
-  <img src="./demo.gif" width="900" alt="SwiftDeck Demo GIF">
+  <img src="./Demo.gft" width="900" alt="SwiftDeck User Manual Screenshot">
 </p>
 
 ---
 
-저는 **전문 개발자가 아니라 재무 부서에서 실무를 수행하는 파이낸셜 매니저**입니다.  
-매일 반복되는 복잡한 ERP 조회, 산재해 있는 월말 결산 폴더 찾기, 이메일 작성 등 단순 반복 작업을 보며, **"나뿐만 아니라 우리 팀원들의 비효율적인 동선까지 제거하여 팀 전체의 생산성을 제고할 방법은 없을까?"** 하는 치열한 고민에서 이 프로젝트를 시작하게 되었습니다.
+# 👨‍💼 개발 배경: "실무의 Pain Point를 직접 해결하는 조직의 리더"
 
-동료들의 실제 애로사항과 업무상 병목 지점(Bottleneck)을 직접 분석하며 점진적으로 발전시킨 **SwiftDeck**은, 이제 단순한 개인용 매크로를 넘어 **부서 전체의 업무 효율을 상향 평준화하고 결산 프로세스를 표준화해 주는 오피스 자동화 플랫폼**으로 고도화되었습니다.
+저는 IT 부서의 **전문 개발자가 아닙니다.** 현재 재무 부서를 이끌며 영업팀 등 여러 유관 부서와의 협업을 조율하는 **파이낸셜 매니저**입니다.  
 
-> **팀 전체 결산 시간 단축 · 부서 내 결산 휴먼 에러 예방 · 반복 업무 제로화 · 표준화된 업무 환경 제공**  
-개인의 업무 효율을 넘어, 부서 및 팀 전체의 시너지를 극대화하기 위해 설계된 실무 중심의 자동화 도구입니다.
+매일 반복되는 복잡한 ERP 시스템 조회, 수십 개의 월말 결산 폴더 탐색, 반복적인 커뮤니케이션 등 파편화된 단순 업무들이 부서 간의 귀중한 시간을 갉아먹는 것을 매일 현장에서 목격했습니다. **"어떻게 하면 여러 팀원들의 비효율적인 업무 동선을 제거하고, 더 가치 있는 핵심 기획 업무에 집중하게 만들 수 있을까?"** 관리자로서 가졌던 이 치열한 고민이 본 프로젝트의 출발점이었습니다.
+
+실무진들의 생생한 애로사항을 청취하고 업무상 병목 지점(Bottleneck)을 분석하여 점진적으로 고도화시킨 **SwiftDeck**은, 이제 단순한 개인 툴을 넘어 **다양한 팀의 업무 효율을 상향 평준화하고 프로세스를 표준화하는 실무 맞춤형 오피스 자동화 플랫폼**으로 자리 잡았습니다. 
+
+> **현장 중심의 문제 해결 능력 · 여러 조직의 Man-Hour 단축 · 휴먼 에러 방지 및 프로세스 표준화**  
+이 프로젝트는 단순한 코딩 기술의 나열이 아닙니다. **현업의 리더로서 비즈니스 현장의 문제를 IT 기술로 직접 해결하고, 여러 팀 전체의 생산성을 극대화한 실질적인 성과물**입니다.
 
 ---
 
@@ -28,13 +31,13 @@ A Professional Productivity Command Center for Finance Managers & Business Profe
 1. 깃허브 화면 우측의 **[Releases]** 탭을 클릭하여 이동합니다.
 2. 가장 최신 릴리즈에 등록된 **`SwiftDeck.zip`** 또는 **`SwiftDeck.exe`** 단독 실행 파일을 다운로드합니다.
 3. 압축을 풀고 **`SwiftDeck.exe`** 파일을 더블 클릭하여 실행하면 윈도우 우측 하단 트레이 영역에 검은색 번개 아이콘이 활성화되며 즉시 동작합니다!
-   - *💡 **팀 생산성 확장 팁**: 공통적으로 자주 쓰는 보고 양식(Prompts)이나 공유 폴더 경로(Folders)를 한 명의 관리자가 대시보드에서 세팅한 뒤, 생성된 설정 파일(`.ini`)을 동료들에게 배포하여 동일한 실행 파일 폴더에 넣고 실행하게 하면 즉시 **부서 전체의 업무 방식 상향 표준화**가 가능합니다.*
+   - *💡 **팀 생산성 확장 팁**: 공통적으로 자주 쓰는 보고 양식(Prompts)이나 공유 폴더 경로(Folders)를 한 명의 관리자가 대시보드에서 세팅한 뒤, 트레이 메뉴의 **Open Settings Folder**에서 생성된 설정 파일(`.ini`)을 동료에게 배포하면 **부서 전체의 업무 방식 상향 표준화**가 가능합니다.*
 
 ### 🛠️ 파워 유저 및 개발자용 (커스텀 빌드)
 본 소프트웨어는 투명하게 소스코드가 전면 공개된 **100% 오픈소스**입니다. 직접 수식을 추가하거나 기능을 고도화하고 싶다면 아래 방식을 참고하세요.
 1. [AutoHotkey v2](https://www.autohotkey.com/)를 설치합니다.
-2. 이 저장소를 Clone하고 `App02_FolderHotKey_v8.1.ahk` 소스 코드를 필요에 맞게 커스텀합니다.
-3. 소스 코드 폴더에 동봉된 `compile_app.cmd` 빌드 도구를 실행하여 본인만의 아이콘과 메타데이터가 적용된 커스텀 `SwiftDeck.exe`를 직접 패키징할 수 있습니다.
+2. 이 저장소를 Clone하고 `SwiftDeck.ahk` 소스 코드를 필요에 맞게 커스텀합니다.
+3. AutoHotkey에 포함된 Ahk2Exe 도구를 사용하면 본인만의 `SwiftDeck.exe`를 직접 패키징할 수 있습니다.
 
 ---
 
@@ -53,6 +56,7 @@ A Professional Productivity Command Center for Finance Managers & Business Profe
 ✔ **✏️ Hotstrings**: 단축 텍스트 지정어 등록 및 즉각적인 자동 완성  
 ✔ **🔀 Key Remap**: 물리적 키의 기능을 더 유용한 단축키/클릭으로 커스텀 매핑  
 ✔ **⚙️ General**: 윈도우 시작 시 자동 실행 활성화 및 테마 관리
+✔ 설정 화면에서 항목을 추가/수정/삭제한 뒤에는 **Save & Apply**를 눌러 저장합니다.
 
 <p align="center">
   <img src="./manual.png" width="1000" alt="SwiftDeck User Manual Screenshot">
