@@ -25,7 +25,7 @@ Designed to maximize synergy for the entire department beyond just individual ef
 It is designed for rapid deployment so that team members without programming knowledge or complex PC setups can utilize it immediately.
 
 ### 📥 For General Users (1-Click Portable Download)
-1. Go to the **[Releases]** tab on the right side of the GitHub repository.
+1. Go to the **[Releases](https://github.com/KwangBeomPark/SwiftDeck/releases)** tab on the right side of the GitHub repository.
 2. Download the latest **`SwiftDeck.zip`** or the standalone **`SwiftDeck.exe`** file.
 3. Unzip and double-click **`SwiftDeck.exe`**. A black lightning bolt icon will activate in your Windows system tray, and it's ready to use instantly!
    - *💡 **Team Productivity Tip**: A manager can configure commonly used reporting formats (Prompts) or shared network paths (Folders) in the dashboard. Share the generated `.ini` files from the tray menu's **Open Settings Folder** entry to instantly **standardize the workflow across the entire department**.*
