@@ -4,15 +4,15 @@
 A Professional Productivity Command Center for Finance Managers & Business Professionals (Built with AutoHotkey v2)
 
 <p align="center">
-  <img src="./demo.gif" width="900" alt="SwiftDeck Demo GIF">
+  <img src="./demo.gif" width="900" alt="SwiftDeck User Manual Screenshot">
 </p>
 
 ---
 
 I am **not a professional software developer, but a Financial Manager performing hands-on operations in a corporate finance department.**  
-Watching the daily repetitive tasks—complex ERP inquiries, searching for scattered month-end closing folders, and writing routine emails—I started this project with a fierce question: **"Is there [...]
+Watching the daily repetitive tasks—complex ERP inquiries, searching for scattered month-end closing folders, and writing routine emails—I started this project with a fierce question: **"Is there a way to eliminate inefficient workflows not just for myself, but to boost the productivity of my entire team?"**
 
-By directly analyzing the real-world pain points and operational bottlenecks of my colleagues, **SwiftDeck** has evolved from a simple personal macro script into an **office automation platform that s[...]
+By directly analyzing the real-world pain points and operational bottlenecks of my colleagues, **SwiftDeck** has evolved from a simple personal macro script into an **office automation platform that standardizes the closing process and elevates the efficiency of the entire department.**
 
 > **Accelerate Team Month-End Closings · Prevent Human Errors · Zero Repetitive Tasks · Standardize Workflows**  
 Designed to maximize synergy for the entire department beyond just individual efficiency, this is a practical automation tool built by professionals, for professionals.
@@ -25,25 +25,25 @@ Designed to maximize synergy for the entire department beyond just individual ef
 It is designed for rapid deployment so that team members without programming knowledge or complex PC setups can utilize it immediately.
 
 ### 📥 For General Users (1-Click Portable Download)
-1. Go to the **[Releases](https://github.com/KwangBeomPark/SwiftDeck/releases)** tab on the right side of the GitHub repository.
+1. Go to the **[Releases]** tab on the right side of the GitHub repository.
 2. Download the latest **`SwiftDeck.zip`** or the standalone **`SwiftDeck.exe`** file.
 3. Unzip and double-click **`SwiftDeck.exe`**. A black lightning bolt icon will activate in your Windows system tray, and it's ready to use instantly!
-   - *💡 **Team Productivity Tip**: A manager can configure commonly used reporting formats (Prompts) or shared network paths (Folders) in the dashboard. By distributing the generated `.ini` configu[...]
+   - *💡 **Team Productivity Tip**: A manager can configure commonly used reporting formats (Prompts) or shared network paths (Folders) in the dashboard. Share the generated `.ini` files from the tray menu's **Open Settings Folder** entry to instantly **standardize the workflow across the entire department**.*
 
 ### 🛠️ For Power Users & Developers (Custom Build)
 This software is **100% open-source** with fully transparent code. If you wish to add custom formulas or advance its features, follow these steps:
 1. Install [AutoHotkey v2](https://www.autohotkey.com/).
-2. Clone this repository and customize the `App02_FolderHotKey_v8.1.ahk` source code to your needs.
-3. Run the included `compile_app.cmd` tool in the source folder to package your own custom `SwiftDeck.exe` with your own metadata and icon.
+2. Clone this repository and customize the `SwiftDeck.ahk` source code to your needs.
+3. Use the Ahk2Exe tool included with AutoHotkey to package your own custom `SwiftDeck.exe`.
 
 ---
 
 # 💼 Practical FinOps & Business Use Cases
 
-- **📂 1-Click Folder Navigation**: Stop wandering through deep network drives, ERP download folders, and monthly evidence directories. Open them instantly via the F1 hotkey menu or custom shortcuts[...]
+- **📂 1-Click Folder Navigation**: Stop wandering through deep network drives, ERP download folders, and monthly evidence directories. Open them instantly via the F1 hotkey menu or custom shortcuts.
 - **⌨️ SQL Query & Macro Automation**: Trigger long, complex SQL queries or frequently used AI prompts with a single shortcut. SwiftDeck will type it out and hit enter for you seamlessly.
 - **📧 Standardized Email Templates & Snippets**: Expand long daily cash reports, budget adjustment requests, or special characters in 0.1 seconds using text auto-complete (Hotstrings).
-- **🖱️ Keyboard & Mouse Fatigue Relief (Key Remapping)**: For professionals doing copy-paste and clicking all day, remap rarely used keys (like CapsLock) into mouse clicks or specialized shor[...]
+- **🖱️ Keyboard & Mouse Fatigue Relief (Key Remapping)**: For professionals doing copy-paste and clicking all day, remap rarely used keys (like CapsLock) into mouse clicks or specialized shortcuts to significantly reduce wrist fatigue.
 
 ---
 
@@ -53,6 +53,7 @@ This software is **100% open-source** with fully transparent code. If you wish t
 ✔ **✏️ Hotstrings**: Register text abbreviations for instant auto-completion  
 ✔ **🔀 Key Remap**: Custom map physical keys to more useful shortcuts or mouse clicks  
 ✔ **⚙️ General**: Toggle 'Run on Windows Startup' and manage dark themes  
+✔ After adding, editing, or deleting items in App Settings, click **Save & Apply** to save changes.
 
 <p align="center">
   <img src="./manual.png" width="1000" alt="SwiftDeck User Manual Screenshot">
@@ -79,7 +80,7 @@ This software is **100% open-source** with fully transparent code. If you wish t
 ---
 
 ## ☕ Support Practical Automation with a Coffee
-If this tool has reduced your month-end closing hours or eased your wrist pain, your warm support is the greatest motivation for developing smarter and more innovative open-source finance automati[...]
+If this tool has reduced your month-end closing hours or eased your wrist pain, your warm support is the greatest motivation for developing smarter and more innovative open-source finance automation tools! 😊
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/KBPark_Bob">
