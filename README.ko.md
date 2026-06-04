@@ -4,7 +4,7 @@
 A Professional Productivity Command Center for Finance Managers & Business Professionals (Built with AutoHotkey v2)
 
 <p align="center">
-  <img src="./Demo.gft" width="900" alt="SwiftDeck User Manual Screenshot">
+  <img src="./Demo.git" width="900" alt="SwiftDeck User Manual Screenshot">
 </p>
 
 ---
