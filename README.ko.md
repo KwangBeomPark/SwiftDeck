@@ -28,7 +28,7 @@ A Professional Productivity Command Center for Finance Managers & Business Profe
 프로그래밍 지식이 없거나 컴퓨터 설정이 서툰 일반 팀원들도 복잡한 설치 없이 원클릭으로 바로 업무에 활용할 수 있도록 배포에 초점을 맞추어 설계되었습니다.
 
 ### 📥 일반 팀원용 (원클릭 무설치 다운로드)
-1. 깃허브 화면 우측의 **[Releases]** 탭을 클릭하여 이동합니다.
+1. 깃허브 화면 우측의 **[Releases](https://github.com/KwangBeomPark/SwiftDeck/releases)** 탭을 클릭하여 이동합니다.
 2. 가장 최신 릴리즈에 등록된 **`SwiftDeck.zip`** 또는 **`SwiftDeck.exe`** 단독 실행 파일을 다운로드합니다.
 3. 압축을 풀고 **`SwiftDeck.exe`** 파일을 더블 클릭하여 실행하면 윈도우 우측 하단 트레이 영역에 검은색 번개 아이콘이 활성화되며 즉시 동작합니다!
    - *💡 **팀 생산성 확장 팁**: 공통적으로 자주 쓰는 보고 양식(Prompts)이나 공유 폴더 경로(Folders)를 한 명의 관리자가 대시보드에서 세팅한 뒤, 트레이 메뉴의 **Open Settings Folder**에서 생성된 설정 파일(`.ini`)을 동료에게 배포하면 **부서 전체의 업무 방식 상향 표준화**가 가능합니다.*
