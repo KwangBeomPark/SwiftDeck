@@ -1,5 +1,4 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
 ; =================================================================================
 ; --- Utility Functions ---
 ; =================================================================================
@@ -16,7 +15,7 @@ OpenFolder(folderPath, Args*) {
     }
 
     if FileExist(folderPath) && !DirExist(folderPath) {
-        Run('explorer.exe /select,"' folderPath '"')
+        RunSafely('explorer.exe /select,"' folderPath '"', "Open Folder")
         return
     }
 
@@ -25,7 +24,17 @@ OpenFolder(folderPath, Args*) {
         return
     }
 
-    Run('explorer.exe "' folderPath '"')
+    RunSafely('explorer.exe "' folderPath '"', "Open Folder")
+}
+
+RunSafely(command, title := "Open Failed") {
+    try {
+        Run(command)
+        return true
+    } catch Error as err {
+        MsgBox("❌ Could not open the requested item.`n`n" . command . "`n`nError: " . err.Message, title, 262160)
+        return false
+    }
 }
 
 AddTrailingBackslash(path) {
@@ -113,6 +122,10 @@ ParseIniKeyValuePairs(lineStr) {
     return { Key: "", Val: "" }
 }
 
+IsPlainIniKeySafe(text) {
+    return !InStr(text, "=") && !InStr(text, "`r") && !InStr(text, "`n")
+}
+
 FixIniSpecialChars(k, v) {
     if (k == ">" && v == "=≥")
         return { Key: ">=", Val: "≥" }
@@ -122,4 +135,3 @@ FixIniSpecialChars(k, v) {
         return { Key: "!=", Val: "≠" }
     return { Key: k, Val: v }
 }
-

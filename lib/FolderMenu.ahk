@@ -1,5 +1,9 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Utils.ahk
+#Include FolderManager.ahk
+#Include DashboardManager.ahk
+; g_FolderMenuCache is owned by this module.
 
 ; =================================================================================
 ; Module: FolderMenu
@@ -14,10 +18,7 @@
 global g_FolderMenuCache := Map()
 
 ShowFavoritesMenu() {
-    global g_filePath_Folder, g_targetFolder, g_fileName_Folder
-
-    ; Read folder items from config and build context menu
-    if !FileExist(g_filePath_Folder) {
+    if !ConfigExists("Folders") {
         MsgBox("⚠️ Cannot find the setting file.", "Error", 262160)
         return
     }
@@ -74,14 +75,14 @@ AddCurrentExplorerFolder() {
     if (DashboardManager.instance)
         DashboardManager.instance.hGui.Opt("+OwnDialogs")
     ib := InputBox("Enter a nickname for this folder:`nPath: " . explorerPath, "Add Folder", "w350 h150", GetFileName(explorerPath))
-    if (ib.Result != "OK" || ib.Value == "")
+    if (ib.Result != "OK" || Trim(ib.Value) == "")
         return
 
     DashboardManager.Show(1)
-    DashboardManager.instance.folderMgr.AddFolderItem(ib.Value, explorerPath)
-
-    ToolTip("✅ Added. Click Save & Apply.")
-    SetTimer(() => ToolTip(), -2000)
+    if DashboardManager.instance.folderMgr.AddFolderItem(ib.Value, explorerPath) {
+        ToolTip("✅ Added. Click Save & Apply.")
+        SetTimer(() => ToolTip(), -2000)
+    }
 }
 
 GetActiveExplorerPath() {
@@ -130,9 +131,9 @@ BuildFolderSubmenu(rootPath, rootLabel) {
     maxLv1 := 30  ; Max Level-1 subfolders to display
     maxLv2 := 20  ; Max Level-2 subfolders to display
 
-    MenuLv0 := Menu()
     ; Show warning menu item if folder doesn't exist or drive is disconnected
     if !FileExist(rootPath) || !InStr(FileExist(rootPath), "D") {
+        MenuLv0 := Menu()
         MenuLv0.Add("No Folder Exist: " . rootPath, ShowFolderWarningMsg.Bind())
         return MenuLv0
     }
@@ -189,16 +190,10 @@ BuildFolderSubmenu(rootPath, rootLabel) {
         }
     }
 
-    if (cntLv1 == 0) {
-        MenuLv0.Add(rootLabel, OpenFolder.Bind(rootPath))
-    } else {
-        MenuLv0.Add(rootLabel, menuLv1)
-    }
-
     ; Update Cache
-    g_FolderMenuCache[rootPath] := { Hash: currentHash, Menu: MenuLv0 }
+    g_FolderMenuCache[rootPath] := { Hash: currentHash, Menu: menuLv1 }
 
-    return MenuLv0
+    return menuLv1
 }
 
 ShowFolderWarningMsg() {

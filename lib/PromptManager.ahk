@@ -1,5 +1,9 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Theme.ahk
+#Include Utils.ahk
+#Include Migration.ahk
+#Include Clipboard.ahk
 
 ; =================================================================================
 ; Module: PromptManager
@@ -250,6 +254,10 @@ class PromptManager {
             m := Trim(edtMsg.Value)
             if (t == "") {
                 MsgBox("⚠️ Please enter a title.", "Warning", 262192)
+                return
+            }
+            if (!IsPlainIniKeySafe(t)) {
+                MsgBox("⚠️ Prompt title cannot contain '=' or line breaks.`nPlease use a simpler title.", "Invalid Prompt Title", 262192)
                 return
             }
 

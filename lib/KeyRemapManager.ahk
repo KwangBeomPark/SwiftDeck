@@ -1,5 +1,7 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Theme.ahk
+#Include Utils.ahk
 
 ; =================================================================================
 ; Module: KeyRemapManager
@@ -357,6 +359,7 @@ LoadKeyRemaps() {
     ; Unregister existing key mappings
     for srcKey in g_registeredKeyRemaps {
         try Hotkey(srcKey, "Off")
+        try Hotkey(srcKey . " Up", "Off")
     }
     g_registeredKeyRemaps.Clear()
 
@@ -366,11 +369,21 @@ LoadKeyRemaps() {
     for item in ConfigReadKeyRemaps() {
         if (item.Src != "" && item.Dst != "") {
             try {
-                Hotkey(item.Src, RemapGenericHandler.Bind(item.Dst))
+                if IsMouseButton(item.Dst) {
+                    Hotkey(item.Src, RemapMouseDownHandler.Bind(item.Dst))
+                    Hotkey(item.Src . " Up", RemapMouseUpHandler.Bind(item.Dst))
+                } else {
+                    Hotkey(item.Src, RemapGenericHandler.Bind(item.Dst))
+                }
                 g_registeredKeyRemaps[item.Src] := item.Dst
             }
         }
     }
+}
+
+IsMouseButton(dst) {
+    lowerDst := StrLower(ParseKeyString(dst).BaseKey)
+    return (lowerDst == "lbutton" || lowerDst == "rbutton" || lowerDst == "mbutton" || lowerDst == "xbutton1" || lowerDst == "xbutton2")
 }
 
 RemapGenericHandler(dst, ThisHotkey) {
@@ -378,21 +391,37 @@ RemapGenericHandler(dst, ThisHotkey) {
         Send(FormatKeyStringForSend(dst))
 }
 
-FormatKeyStringForSend(keyStr) {
+RemapMouseDownHandler(dst, ThisHotkey) {
+    if (dst != "")
+        Send(FormatKeyStringForSend(dst, "Down"))
+}
+
+RemapMouseUpHandler(dst, ThisHotkey) {
+    if (dst != "")
+        Send(FormatKeyStringForSend(dst, "Up"))
+}
+
+FormatKeyStringForSend(keyStr, eventType := "") {
     parsed := ParseKeyString(keyStr)
     modStr := BuildKeyString(parsed.Mods.Ctrl, parsed.Mods.Shift, parsed.Mods.Win, parsed.Mods.Alt, "")
     baseKey := parsed.BaseKey
 
+    if (eventType != "")
+        suffix := " " . eventType
+    else
+        suffix := ""
+
     if (baseKey == "")
         return modStr
-    if (StrLen(baseKey) == 1)
+    if (StrLen(baseKey) == 1 && suffix == "")
         return modStr . baseKey
-    return modStr . "{" . baseKey . "}"
+    return modStr . "{" . baseKey . suffix . "}"
 }
 
 CleanupKeyRemaps(ExitReason, ExitCode) {
     global g_registeredKeyRemaps
     for srcKey in g_registeredKeyRemaps {
         try Hotkey(srcKey, "Off")
+        try Hotkey(srcKey . " Up", "Off")
     }
 }

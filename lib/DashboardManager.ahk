@@ -1,5 +1,13 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Theme.ahk
+#Include FolderManager.ahk
+#Include PromptManager.ahk
+#Include HotstringManager.ahk
+#Include KeyRemapManager.ahk
+#Include PreferencesManager.ahk
+#Include AppInfo.ahk
+#Include Manual.ahk
+; Runtime global g_appVersion is initialized in SwiftDeck.ahk before this module is included.
 
 ; =================================================================================
 ; Module: DashboardManager

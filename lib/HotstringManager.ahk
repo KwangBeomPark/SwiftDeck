@@ -1,5 +1,10 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include HotstringRuntime.ahk
+#Include Theme.ahk
+#Include Utils.ahk
+; Runtime globals such as g_registeredHotstrings are initialized in SwiftDeck.ahk
+; before this module is included.
 
 ; =================================================================================
 ; Module: HotstringManager
@@ -124,24 +129,23 @@ class HotstringManager {
         ; Close button
         btnGClose := popup.Add("Button", "x290 y253 w120 h32", "Close")
 
-        ; Helper: refresh the popup's group list
         RefreshGroupList(selectName := "") {
             lbGroups.Delete()
             groupNames := []
-            for _, secName in this.groupOrder {
-                gn := this.GetGroupName(secName)
-                if (gn != "") {
-                    prefix := (SubStr(secName, 1, 11) == "Group_Menu_") ? "📋 " : "⌨️ "
-                    itemCount := this.localData.Has(secName) ? this.localData[secName].Length : 0
-                    groupNames.Push(prefix . gn . "  (" . itemCount . ")")
+            for _, groupSection in this.groupOrder {
+                groupName := this.GetGroupName(groupSection)
+                if (groupName != "") {
+                    prefix := (SubStr(groupSection, 1, 11) == "Group_Menu_") ? "📋 " : "⌨️ "
+                    itemCount := this.localData.Has(groupSection) ? this.localData[groupSection].Length : 0
+                    groupNames.Push(prefix . groupName . "  (" . itemCount . ")")
                 }
             }
             if (groupNames.Length > 0)
                 lbGroups.Add(groupNames)
 
             if (selectName != "") {
-                for i, secName in this.groupOrder {
-                    if (this.GetGroupName(secName) == selectName) {
+                for i, groupSection in this.groupOrder {
+                    if (this.GetGroupName(groupSection) == selectName) {
                         lbGroups.Choose(i)
                         break
                     }
@@ -151,12 +155,10 @@ class HotstringManager {
             }
         }
 
-        ; Helper: get the selected group's index in groupOrder
         GetSelectedIdx() {
             return lbGroups.Value
         }
 
-        ; --- Add Group ---
         btnGAdd.OnEvent("Click", (*) => OnAdd())
         OnAdd() {
             popup.Opt("+OwnDialogs")
@@ -164,36 +166,35 @@ class HotstringManager {
 
             if (ib.Result != "OK" || Trim(ib.Value) == "")
                 return
-            gInput := Trim(ib.Value)
-            isMenuOnly := (SubStr(gInput, 1, 1) == "*")
-            gName := isMenuOnly ? Trim(SubStr(gInput, 2)) : gInput
-            gName := Trim(gName)
-            if (gName == "") {
+            groupInput := Trim(ib.Value)
+            isMenuOnly := (SubStr(groupInput, 1, 1) == "*")
+            groupName := isMenuOnly ? Trim(SubStr(groupInput, 2)) : groupInput
+            groupName := Trim(groupName)
+            if (groupName == "") {
                 MsgBox("⚠️ Group name cannot be empty.", "Warning", 262192)
                 return
             }
-            if (this.localData.Has("Group_Space_" . gName) || this.localData.Has("Group_Menu_" . gName)) {
-                MsgBox("⚠️ Group '" . gName . "' already exists.", "Duplicate Group", 262160)
+            if (this.localData.Has("Group_Space_" . groupName) || this.localData.Has("Group_Menu_" . groupName)) {
+                MsgBox("⚠️ Group '" . groupName . "' already exists.", "Duplicate Group", 262160)
                 return
             }
-            sec := (isMenuOnly ? "Group_Menu_" : "Group_Space_") . gName
-            this.localData[sec] := []
-            this.groupOrder.Push(sec)
-            this.UpdateGroupsDdl(gName)
+            groupSection := (isMenuOnly ? "Group_Menu_" : "Group_Space_") . groupName
+            this.localData[groupSection] := []
+            this.groupOrder.Push(groupSection)
+            this.UpdateGroupsDdl(groupName)
             this.RefreshList(0)
-            RefreshGroupList(gName)
-            ToolTip("✅ Group '" . gName . "' Created. Click Save & Apply.")
+            RefreshGroupList(groupName)
+            ToolTip("✅ Group '" . groupName . "' Created. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
         }
 
-        ; --- Rename Group ---
         btnGRename.OnEvent("Click", (*) => OnRename())
         OnRename() {
-            selIdx := GetSelectedIdx()
-            if (selIdx == 0 || selIdx > this.groupOrder.Length)
+            selectedIndex := GetSelectedIdx()
+            if (selectedIndex == 0 || selectedIndex > this.groupOrder.Length)
                 return
-            oldSec := this.groupOrder[selIdx]
-            oldName := this.GetGroupName(oldSec)
+            oldSection := this.groupOrder[selectedIndex]
+            oldName := this.GetGroupName(oldSection)
             if (oldName == "Default") {
                 MsgBox("⚠️ The Default group cannot be renamed.", "Warning", 262192)
                 return
@@ -209,19 +210,16 @@ class HotstringManager {
                 MsgBox("⚠️ Group '" . newName . "' already exists.", "Duplicate Group", 262160)
                 return
             }
-            ; Preserve prefix type (Space or Menu)
-            isMenu := (SubStr(oldSec, 1, 11) == "Group_Menu_")
-            newSec := (isMenu ? "Group_Menu_" : "Group_Space_") . newName
+            isMenuGroup := (SubStr(oldSection, 1, 11) == "Group_Menu_")
+            newSection := (isMenuGroup ? "Group_Menu_" : "Group_Space_") . newName
 
-            ; Migrate data
-            if (this.localData.Has(oldSec)) {
-                this.localData[newSec] := this.localData[oldSec]
-                this.localData.Delete(oldSec)
+            if (this.localData.Has(oldSection)) {
+                this.localData[newSection] := this.localData[oldSection]
+                this.localData.Delete(oldSection)
             } else {
-                this.localData[newSec] := []
+                this.localData[newSection] := []
             }
-            ; Update groupOrder
-            this.groupOrder[selIdx] := newSec
+            this.groupOrder[selectedIndex] := newSection
 
             this.UpdateGroupsDdl(newName)
             this.RefreshList(0)
@@ -230,49 +228,46 @@ class HotstringManager {
             SetTimer(() => ToolTip(), -2000)
         }
 
-        ; --- Delete Group ---
         btnGDelete.OnEvent("Click", (*) => OnDelete())
         OnDelete() {
-            selIdx := GetSelectedIdx()
-            if (selIdx == 0 || selIdx > this.groupOrder.Length)
+            selectedIndex := GetSelectedIdx()
+            if (selectedIndex == 0 || selectedIndex > this.groupOrder.Length)
                 return
-            sec := this.groupOrder[selIdx]
-            gName := this.GetGroupName(sec)
-            if (gName == "Default") {
+            groupSection := this.groupOrder[selectedIndex]
+            groupName := this.GetGroupName(groupSection)
+            if (groupName == "Default") {
                 MsgBox("⚠️ The Default group cannot be deleted.", "Warning", 262192)
                 return
             }
-            itemCount := this.localData.Has(sec) ? this.localData[sec].Length : 0
-            msgRes := MsgBox("❓ Are you sure you want to delete group '" . gName . "'?`n(" . itemCount . " hotstrings will be removed)", "Delete Group", 262436)
+            itemCount := this.localData.Has(groupSection) ? this.localData[groupSection].Length : 0
+            msgRes := MsgBox("❓ Are you sure you want to delete group '" . groupName . "'?`n(" . itemCount . " hotstrings will be removed)", "Delete Group", 262436)
             if (msgRes != "Yes")
                 return
-            if (this.localData.Has(sec))
-                this.localData.Delete(sec)
-            this.groupOrder.RemoveAt(selIdx)
+            if (this.localData.Has(groupSection))
+                this.localData.Delete(groupSection)
+            this.groupOrder.RemoveAt(selectedIndex)
             this.UpdateGroupsDdl()
             this.RefreshList(0)
             RefreshGroupList()
-            ToolTip("✅ Group '" . gName . "' Deleted. Click Save & Apply.")
+            ToolTip("✅ Group '" . groupName . "' Deleted. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
         }
 
-        ; --- Move Up ---
         btnGUp.OnEvent("Click", (*) => OnMove(-1))
-        ; --- Move Down ---
         btnGDown.OnEvent("Click", (*) => OnMove(1))
         OnMove(dir) {
-            selIdx := GetSelectedIdx()
-            if (selIdx == 0)
+            selectedIndex := GetSelectedIdx()
+            if (selectedIndex == 0)
                 return
-            targetIdx := selIdx + dir
+            targetIdx := selectedIndex + dir
             if (targetIdx < 1 || targetIdx > this.groupOrder.Length)
                 return
-            gName := this.GetGroupName(this.groupOrder[selIdx])
-            temp := this.groupOrder[selIdx]
-            this.groupOrder[selIdx] := this.groupOrder[targetIdx]
+            groupName := this.GetGroupName(this.groupOrder[selectedIndex])
+            temp := this.groupOrder[selectedIndex]
+            this.groupOrder[selectedIndex] := this.groupOrder[targetIdx]
             this.groupOrder[targetIdx] := temp
-            this.UpdateGroupsDdl(gName)
-            RefreshGroupList(gName)
+            this.UpdateGroupsDdl(groupName)
+            RefreshGroupList(groupName)
         }
 
         btnGClose.OnEvent("Click", (*) => CleanUpAndClose())
@@ -281,11 +276,11 @@ class HotstringManager {
         popup.Show("w425 h300")
     }
 
-    GetGroupName(secName) {
-        if (SubStr(secName, 1, 12) == "Group_Space_")
-            return SubStr(secName, 13)
-        if (SubStr(secName, 1, 11) == "Group_Menu_")
-            return SubStr(secName, 12)
+    GetGroupName(groupSection) {
+        if (SubStr(groupSection, 1, 12) == "Group_Space_")
+            return SubStr(groupSection, 13)
+        if (SubStr(groupSection, 1, 11) == "Group_Menu_")
+            return SubStr(groupSection, 12)
         return ""
     }
 
@@ -295,11 +290,11 @@ class HotstringManager {
 
     UpdateGroupsDdl(selectGroup := "") {
         groups := []
-        for _, secName in this.groupOrder {
-            if (this.localData.Has(secName)) {
-                gn := this.GetGroupName(secName)
-                if (gn != "")
-                    groups.Push(gn)
+        for _, groupSection in this.groupOrder {
+            if (this.localData.Has(groupSection)) {
+                groupName := this.GetGroupName(groupSection)
+                if (groupName != "")
+                    groups.Push(groupName)
             }
         }
 
@@ -315,9 +310,9 @@ class HotstringManager {
     }
 
     OnGroupChange() {
-        sec := this.GetCurrentSection()
-        if (sec != "" && !this.localData.Has(sec)) {
-            this.localData[sec] := []
+        groupSection := this.GetCurrentSection()
+        if (groupSection != "" && !this.localData.Has(groupSection)) {
+            this.localData[groupSection] := []
         }
         this.RefreshList(0)
     }
@@ -328,19 +323,18 @@ class HotstringManager {
             displayName := "Default"
         rawName := this.GetRawGroupName(displayName)
 
-        ; Check if it exists as Menu group first
         if (this.localData.Has("Group_Menu_" . rawName))
             return "Group_Menu_" . rawName
         return "Group_Space_" . rawName
     }
 
     IsDuplicateKey(keyToCheck, currentSec, currentIdx := 0) {
-        for secName, items in this.localData {
+        for groupSection, items in this.localData {
             for idx, item in items {
-                if (secName == currentSec && idx == currentIdx)
+                if (groupSection == currentSec && idx == currentIdx)
                     continue
                 if (StrLower(item.Key) == StrLower(keyToCheck)) {
-                    return this.GetGroupName(secName)
+                    return this.GetGroupName(groupSection)
                 }
             }
         }
@@ -348,13 +342,13 @@ class HotstringManager {
     }
 
     RefreshList(targetIdx := 0) {
-        sec := this.GetCurrentSection()
+        groupSection := this.GetCurrentSection()
 
         this.lbItems.Delete()
         listData := []
 
-        if (this.localData.Has(sec)) {
-            for idx, item in this.localData[sec] {
+        if (this.localData.Has(groupSection)) {
+            for idx, item in this.localData[groupSection] {
                 displayVal := StrReplace(item.Val, "`n", " ↵ ")
                 if (StrLen(displayVal) > 25)
                     displayVal := SubStr(displayVal, 1, 25) . "…"
@@ -378,24 +372,24 @@ class HotstringManager {
     }
 
     MoveItem(dir) {
-        sec := this.GetCurrentSection()
+        groupSection := this.GetCurrentSection()
         idx := this.lbItems.Value
         if (idx == 0)
             return
 
         targetIdx := idx + dir
-        if (targetIdx < 1 || targetIdx > this.localData[sec].Length)
+        if (targetIdx < 1 || targetIdx > this.localData[groupSection].Length)
             return
 
-        temp := this.localData[sec][idx]
-        this.localData[sec][idx] := this.localData[sec][targetIdx]
-        this.localData[sec][targetIdx] := temp
+        temp := this.localData[groupSection][idx]
+        this.localData[groupSection][idx] := this.localData[groupSection][targetIdx]
+        this.localData[groupSection][targetIdx] := temp
 
         this.RefreshList(targetIdx)
     }
 
     ShowEditPopup(isEdit := false, editIdx := 0) {
-        sec := this.GetCurrentSection()
+        groupSection := this.GetCurrentSection()
         WinSetEnabled(0, this.mainHwnd)
         popup := Gui("+AlwaysOnTop +Owner" . this.mainHwnd . " -MinimizeBox -MaximizeBox", isEdit ? "Edit Hotstring" : "Add Hotstring")
 
@@ -408,20 +402,17 @@ class HotstringManager {
         popup.BackColor := "FFFFFF"
         popup.SetFont("s10 cBlack", "Segoe UI")
 
-        ; Pre-fill values if editing
         existingKey := ""
         existingVal := ""
-        if (isEdit && this.localData.Has(sec) && editIdx > 0 && editIdx <= this.localData[sec].Length) {
-            existingKey := this.localData[sec][editIdx].Key
-            existingVal := this.localData[sec][editIdx].Val
+        if (isEdit && this.localData.Has(groupSection) && editIdx > 0 && editIdx <= this.localData[groupSection].Length) {
+            existingKey := this.localData[groupSection][editIdx].Key
+            existingVal := this.localData[groupSection][editIdx].Val
         }
 
-        ; --- Abbreviation Section ---
         popup.Add("GroupBox", "x15 y10 w400 h90 cBlack", "③ Abbreviation (Trigger)")
         popup.Add("Text", "x30 y30 w370 c666666", "Type this text to trigger the expansion:")
         edtKey := popup.Add("Edit", "x30 y55 w370 h30", existingKey)
 
-        ; --- Replacement Section ---
         popup.Add("GroupBox", "x15 y115 w400 h120 cBlack", "④ Replacement (Output)")
         popup.Add("Text", "x30 y135 w370 c666666", "The abbreviation will be replaced with this text:")
         edtVal := popup.Add("Edit", "x30 y158 w370 h60", existingVal)
@@ -436,30 +427,30 @@ class HotstringManager {
         btnCancel.OnEvent("Click", (*) => CleanUpAndClose())
 
         OnConfirm() {
-            k := Trim(edtKey.Value)
-            v := Trim(edtVal.Value)
-            if (k == "" || v == "") {
+            triggerText := Trim(edtKey.Value)
+            replacementText := Trim(edtVal.Value)
+            if (triggerText == "" || replacementText == "") {
                 MsgBox("⚠️ Please enter both an abbreviation and its replacement text.", "Warning", 262192)
                 return
             }
 
-            dupGroup := this.IsDuplicateKey(k, sec, isEdit ? editIdx : 0)
-            if (dupGroup != "") {
-                MsgBox("⚠️ The abbreviation '" . k . "' is already registered in group: " . dupGroup . ".`nDuplicates are not allowed.", "Duplicate", 262160)
+            duplicateGroup := this.IsDuplicateKey(triggerText, groupSection, isEdit ? editIdx : 0)
+            if (duplicateGroup != "") {
+                MsgBox("⚠️ The abbreviation '" . triggerText . "' is already registered in group: " . duplicateGroup . ".`nDuplicates are not allowed.", "Duplicate", 262160)
                 return
             }
 
-            if (!this.localData.Has(sec))
-                this.localData[sec] := []
+            if (!this.localData.Has(groupSection))
+                this.localData[groupSection] := []
 
             if (isEdit) {
-                this.localData[sec][editIdx].Key := k
-                this.localData[sec][editIdx].Val := v
+                this.localData[groupSection][editIdx].Key := triggerText
+                this.localData[groupSection][editIdx].Val := replacementText
             } else {
-                this.localData[sec].Push({ Key: k, Val: v })
+                this.localData[groupSection].Push({ Key: triggerText, Val: replacementText })
             }
 
-            this.RefreshList(isEdit ? editIdx : this.localData[sec].Length)
+            this.RefreshList(isEdit ? editIdx : this.localData[groupSection].Length)
             CleanUpAndClose()
             ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
@@ -469,20 +460,20 @@ class HotstringManager {
     }
 
     DeleteItem() {
-        sec := this.GetCurrentSection()
-        selIdx := this.lbItems.Value
-        if (selIdx == 0)
+        groupSection := this.GetCurrentSection()
+        selectedIndex := this.lbItems.Value
+        if (selectedIndex == 0)
             return
 
-        item := this.localData[sec][selIdx]
+        item := this.localData[groupSection][selectedIndex]
         friendlyItem := "[ " . item.Key . " ]  ▶  " . StrReplace(item.Val, "`n", " ↵ ")
         msgRes := MsgBox("❓ Are you sure you want to delete this hotstring?`n`n" . friendlyItem, "Confirm Delete", 262436)
         if (msgRes != "Yes")
             return
 
-        this.localData[sec].RemoveAt(selIdx)
+        this.localData[groupSection].RemoveAt(selectedIndex)
 
-        this.RefreshList(selIdx > this.localData[sec].Length ? this.localData[sec].Length : selIdx)
+        this.RefreshList(selectedIndex > this.localData[groupSection].Length ? this.localData[groupSection].Length : selectedIndex)
         ToolTip("✅ Deleted. Click Save & Apply.")
         SetTimer(() => ToolTip(), -2000)
     }
@@ -493,47 +484,5 @@ class HotstringManager {
         BuildEmojiMenu()
         ToolTip("✅ Saved & Applied")
         SetTimer(() => ToolTip(), -2000)
-    }
-}
-
-LoadHotstrings() {
-    global g_filePath_Hotstring, g_registeredHotstrings
-
-    ; Deactivate all previously registered hotstrings
-    for hsKey in g_registeredHotstrings {
-        try Hotstring(hsKey, , "Off")
-    }
-    g_registeredHotstrings := []
-
-    if !ConfigExists("Hotstrings")
-        return
-
-    sections := ""
-    try sections := ConfigReadSections("Hotstrings")
-    if (sections == "")
-        return
-
-    loop parse, sections, "`n", "`r" {
-        secName := Trim(A_LoopField)
-        if (secName == "" || secName == "Meta")
-            continue
-        if (SubStr(secName, 1, 12) != "Group_Space_")
-            continue
-
-        pairs := ""
-        try pairs := ConfigReadSection("Hotstrings", secName, "")
-        if (pairs == "")
-            continue
-
-        loop parse, pairs, "`n", "`r" {
-            pair := ParseIniKeyValuePairs(A_LoopField)
-            if (pair.Key != "") {
-                fixed := FixIniSpecialChars(pair.Key, pair.Val)
-                hsKey := ":*:" . fixed.Key
-                Hotstring(hsKey, fixed.Val)
-                Hotstring(hsKey, , "On")
-                g_registeredHotstrings.Push(hsKey)
-            }
-        }
     }
 }

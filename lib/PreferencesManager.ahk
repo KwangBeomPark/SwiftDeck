@@ -1,5 +1,8 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Theme.ahk
+#Include Utils.ahk
+#Include Migration.ahk
 
 ; =================================================================================
 ; Module: PreferencesManager

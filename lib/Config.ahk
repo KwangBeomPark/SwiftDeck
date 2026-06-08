@@ -1,46 +1,124 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Utils.ahk
+; NOTE: Global variables (g_targetFolder, g_filePath_*) are declared in SwiftDeck.ahk.
 ; =============================================================================
 ; --- Config File Initialization & Management ---
 ; =============================================================================
 
+ConfigGetManagedFiles() {
+    global g_fileName_Folder, g_fileName_Hotkey, g_fileName_Hotstring, g_fileName_KeyRemap
+    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
+
+    return [
+        {
+            CanonicalName: "Folders",
+            Aliases: ["Settings", "Folders", "Favorites"],
+            FileName: g_fileName_Folder,
+            Path: g_filePath_Folder,
+            ResetTarget: "Favorites",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "Prompts",
+            Aliases: ["Prompts", "Hotkeys"],
+            FileName: g_fileName_Hotkey,
+            Path: g_filePath_Hotkey,
+            ResetTarget: "Prompts",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "Hotstrings",
+            Aliases: ["Hotstrings"],
+            FileName: g_fileName_Hotstring,
+            Path: g_filePath_Hotstring,
+            ResetTarget: "Hotstrings",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "KeyRemaps",
+            Aliases: ["KeyRemaps", "Key Remaps"],
+            FileName: g_fileName_KeyRemap,
+            Path: g_filePath_KeyRemap,
+            ResetTarget: "Key Remaps",
+            RequiredBackup: false
+        }
+    ]
+}
+
+ConfigGetSettingsFolder() {
+    global g_targetFolder
+    return g_targetFolder
+}
+
+ConfigGetDefaultText(canonicalName) {
+    switch canonicalName {
+        case "Folders":
+            return GetDefaultFolderData()
+        case "Prompts":
+            return GetDefaultHotkeyData()
+        case "Hotstrings":
+            return GetDefaultHotstringData()
+        case "KeyRemaps":
+            return GetDefaultKeyRemapData()
+        default:
+            throw Error("Unknown default config: " . canonicalName)
+    }
+}
+
+ConfigManagedFileMatches(fileDef, configName) {
+    for aliasName in fileDef.Aliases {
+        if (aliasName == configName)
+            return true
+    }
+    return false
+}
+
+ConfigGetManagedFile(configName) {
+    for fileDef in ConfigGetManagedFiles() {
+        if ConfigManagedFileMatches(fileDef, configName)
+            return fileDef
+    }
+    throw Error("Unknown config file: " . configName)
+}
+
+ConfigIsFirstRun() {
+    return !FileExist(GetConfigPath("Folders"))
+}
+
+InitializeAllConfigs() {
+    for fileDef in ConfigGetManagedFiles() {
+        InitializeConfig(fileDef.FileName, ConfigGetDefaultText(fileDef.CanonicalName))
+    }
+}
+
 InitializeConfig(fileName, defaultText) {
     global g_targetFolder
 
-    ; Create target folder if it doesn't exist
-    if !DirExist(g_targetFolder) {
-        DirCreate(g_targetFolder)
-    }
+    ConfigEnsureDir(g_targetFolder)
 
     targetFile := g_targetFolder . fileName
 
-    ; [Step 1] Check if config file already exists locally
     if (FileExist(targetFile)) {
-        return ; File exists, nothing to do
+        return
     }
 
-    ; [Step 2] Create file from built-in default template
     try {
-        ; UTF-8-RAW: Save without BOM (BOM breaks Windows INI API for first section)
-        FileAppend(defaultText, targetFile, "UTF-8-RAW")
-    } catch {
-        MsgBox("⚠️ Cannot create file in the target drive.`n`nPath: " . targetFile, "Error", 262160)
+        ConfigWriteTextFileSafely(targetFile, defaultText, "UTF-16")
+    } catch Error as err {
+        MsgBox("⚠️ Cannot create file in the target drive.`n`nPath: " . targetFile . "`n`nError: " . err.Message, "Error", 262160)
     }
 }
 
 BackupConfigs(showMsg := false) {
-    global g_targetFolder, g_fileName_Folder, g_fileName_Hotkey, g_fileName_Hotstring, g_fileName_KeyRemap
-    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
+    global g_targetFolder
     backupDir := g_targetFolder . "Backups\"
-    if !DirExist(backupDir)
-        DirCreate(backupDir)
+    ConfigEnsureDir(backupDir)
 
     try {
-        FileCopy(g_filePath_Folder, backupDir . g_fileName_Folder . ".bak", true)
-        FileCopy(g_filePath_Hotkey, backupDir . g_fileName_Hotkey . ".bak", true)
-        FileCopy(g_filePath_Hotstring, backupDir . g_fileName_Hotstring . ".bak", true)
-        if FileExist(g_filePath_KeyRemap)
-            FileCopy(g_filePath_KeyRemap, backupDir . g_fileName_KeyRemap . ".bak", true)
+        for fileDef in ConfigGetManagedFiles() {
+            if (fileDef.RequiredBackup || FileExist(fileDef.Path))
+                FileCopy(fileDef.Path, ConfigGetBackupPath(backupDir, fileDef.Path), true)
+        }
         if (showMsg)
             MsgBox("✅ Settings have been backed up successfully.", "Backup Complete", 262208)
     } catch {
@@ -50,9 +128,20 @@ BackupConfigs(showMsg := false) {
 }
 
 RestoreConfigs() {
-    global g_targetFolder, g_fileName_Folder, g_fileName_Hotkey, g_fileName_Hotstring, g_fileName_KeyRemap
-    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
+    global g_targetFolder
     backupDir := g_targetFolder . "Backups\"
+    managedFiles := ConfigGetManagedFiles()
+    requiredBackups := []
+    for fileDef in managedFiles {
+        if fileDef.RequiredBackup
+            requiredBackups.Push(ConfigGetBackupPath(backupDir, fileDef.Path))
+    }
+
+    missingBackups := ConfigListMissingFiles(requiredBackups)
+    if (missingBackups != "") {
+        MsgBox("❌ Cannot restore because required backup files are missing:`n`n" . missingBackups, "Restore Blocked", 262160)
+        return
+    }
 
     msgRes := MsgBox(
         "⚠️ Are you sure you want to restore the settings from the last backup?`nYour current settings will be overwritten.",
@@ -60,23 +149,118 @@ RestoreConfigs() {
     if (msgRes != "Yes")
         return
 
+    rollbackDir := g_targetFolder . "RestoreRollback_" . A_Now . "_" . A_TickCount . "\"
+    currentPaths := []
     try {
-        FileCopy(backupDir . g_fileName_Folder . ".bak", g_filePath_Folder, true)
-        FileCopy(backupDir . g_fileName_Hotkey . ".bak", g_filePath_Hotkey, true)
-        FileCopy(backupDir . g_fileName_Hotstring . ".bak", g_filePath_Hotstring, true)
-        if FileExist(backupDir . g_fileName_KeyRemap . ".bak")
-            FileCopy(backupDir . g_fileName_KeyRemap . ".bak", g_filePath_KeyRemap, true)
+        ConfigEnsureDir(rollbackDir)
+        for fileDef in managedFiles {
+            currentPaths.Push(fileDef.Path)
+            ConfigBackupCurrentFileForRollback(rollbackDir, fileDef.Path)
+        }
 
+        for fileDef in managedFiles {
+            backupPath := ConfigGetBackupPath(backupDir, fileDef.Path)
+            if (fileDef.RequiredBackup || FileExist(backupPath))
+                FileCopy(backupPath, fileDef.Path, true)
+        }
+
+        ConfigDeleteDirQuietly(rollbackDir)
         MsgBox("✅ Restoration complete. The app will now reload to apply changes.", "Restore Complete", 262208)
         Reload()
-    } catch {
-        MsgBox("❌ An error occurred during restoration. Please verify that the backup files exist.", "Error", 262160)
+    } catch Error as err {
+        ConfigRestoreFilesFromRollback(rollbackDir, currentPaths)
+        ConfigDeleteDirQuietly(rollbackDir)
+        MsgBox("❌ Restore failed and current settings were rolled back.`n`nError: " . err.Message, "Restore Error", 262160)
+    }
+}
+
+ConfigGetBackupPath(backupDir, sourcePath) {
+    SplitPath(sourcePath, &fileName)
+    return backupDir . fileName . ".bak"
+}
+
+ConfigEnsureDir(dirPath) {
+    if (dirPath != "" && !DirExist(dirPath))
+        DirCreate(dirPath)
+}
+
+ConfigMakeTempPath(targetPath, tag := "tmp") {
+    SplitPath(targetPath, &fileName, &dirPath)
+    loop 50 {
+        tempPath := dirPath . "\" . fileName . "." . tag . "." . A_Now . "." . A_TickCount . "." . A_Index
+        if !FileExist(tempPath)
+            return tempPath
+    }
+    throw Error("Cannot create a temporary file path for: " . targetPath)
+}
+
+ConfigWriteTextFileSafely(targetPath, content, encoding := "UTF-16") {
+    SplitPath(targetPath, , &dirPath)
+    ConfigEnsureDir(dirPath)
+
+    tempPath := ConfigMakeTempPath(targetPath, "tmp")
+    rollbackPath := ""
+    try {
+        ; Write to a temp file first so a failed write does not destroy the current config.
+        FileAppend(content, tempPath, encoding)
+        if FileExist(targetPath)
+            rollbackPath := ConfigCreateRollbackCopy(targetPath)
+        FileMove(tempPath, targetPath, true)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(targetPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(tempPath)
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
+}
+
+ConfigCreateRollbackCopy(targetPath) {
+    if !FileExist(targetPath)
+        return ""
+    rollbackPath := ConfigMakeTempPath(targetPath, "rollback")
+    FileCopy(targetPath, rollbackPath, true)
+    return rollbackPath
+}
+
+ConfigRestoreRollbackCopy(targetPath, rollbackPath) {
+    if (rollbackPath != "" && FileExist(rollbackPath))
+        try FileCopy(rollbackPath, targetPath, true)
+}
+
+ConfigDeleteFileQuietly(path) {
+    if (path != "" && FileExist(path))
+        try FileDelete(path)
+}
+
+ConfigDeleteDirQuietly(path) {
+    if (path != "" && DirExist(path))
+        try DirDelete(path, true)
+}
+
+ConfigListMissingFiles(paths) {
+    missing := ""
+    for path in paths {
+        if !FileExist(path)
+            missing .= path . "`n"
+    }
+    return RTrim(missing, "`n")
+}
+
+ConfigBackupCurrentFileForRollback(rollbackDir, sourcePath) {
+    if FileExist(sourcePath)
+        FileCopy(sourcePath, ConfigGetBackupPath(rollbackDir, sourcePath), true)
+}
+
+ConfigRestoreFilesFromRollback(rollbackDir, sourcePaths) {
+    for sourcePath in sourcePaths {
+        rollbackPath := ConfigGetBackupPath(rollbackDir, sourcePath)
+        if FileExist(rollbackPath)
+            try FileCopy(rollbackPath, sourcePath, true)
     }
 }
 
 ResetToDefaults(target := "All") {
-    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
-
     msg := ""
     if (target == "All")
         msg := "⚠️ Are you sure you want to FACTORY RESET ALL settings?`nAll your custom configurations will be deleted.`n(Backups will not be affected.)"
@@ -87,26 +271,14 @@ ResetToDefaults(target := "All") {
         return
 
     try {
-        if (target == "All" || target == "Favorites") {
-            try FileDelete(g_filePath_Folder)
-            FileAppend(GetDefaultFolderData(), g_filePath_Folder, "UTF-8-RAW")
-        }
-        if (target == "All" || target == "Prompts") {
-            try FileDelete(g_filePath_Hotkey)
-            FileAppend(GetDefaultHotkeyData(), g_filePath_Hotkey, "UTF-8-RAW")
-        }
-        if (target == "All" || target == "Hotstrings") {
-            try FileDelete(g_filePath_Hotstring)
-            FileAppend(GetDefaultHotstringData(), g_filePath_Hotstring, "UTF-8-RAW")
-        }
-        if (target == "All" || target == "Key Remaps") {
-            try FileDelete(g_filePath_KeyRemap)
-            FileAppend(GetDefaultKeyRemapData(), g_filePath_KeyRemap, "UTF-8-RAW")
+        for fileDef in ConfigGetManagedFiles() {
+            if (target == "All" || target == fileDef.ResetTarget)
+                ConfigWriteTextFileSafely(fileDef.Path, ConfigGetDefaultText(fileDef.CanonicalName), "UTF-16")
         }
         MsgBox("✅ Reset complete. The app will now reload.", "Success", 262208)
         Reload()
-    } catch {
-        MsgBox("❌ An error occurred while resetting settings.", "Error", 262160)
+    } catch Error as err {
+        MsgBox("❌ An error occurred while resetting settings.`n`nError: " . err.Message, "Error", 262160)
     }
 }
 
@@ -114,20 +286,7 @@ ResetToDefaults(target := "All") {
 ; SECTION: Central Config Gateway
 ; =============================================================================
 GetConfigPath(configName) {
-    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
-
-    switch configName {
-        case "Settings", "Folders", "Favorites":
-            return g_filePath_Folder
-        case "Prompts", "Hotkeys":
-            return g_filePath_Hotkey
-        case "Hotstrings":
-            return g_filePath_Hotstring
-        case "KeyRemaps", "Key Remaps":
-            return g_filePath_KeyRemap
-        default:
-            throw Error("Unknown config file: " . configName)
-    }
+    return ConfigGetManagedFile(configName).Path
 }
 
 ConfigExists(configName) {
@@ -143,7 +302,16 @@ ConfigReadValue(configName, section, key, defaultValue := "") {
 }
 
 ConfigWriteValue(configName, section, key, value) {
-    IniWrite(value, GetConfigPath(configName), section, key)
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        IniWrite(value, configPath, section, key)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
 }
 
 ConfigReadSection(configName, section, defaultValue := "") {
@@ -155,15 +323,33 @@ ConfigReadSection(configName, section, defaultValue := "") {
 }
 
 ConfigWriteSection(configName, section, content) {
-    if (content != "") {
-        IniWrite(content, GetConfigPath(configName), section)
-    } else {
-        try IniDelete(GetConfigPath(configName), section)
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        if (content != "") {
+            IniWrite(content, configPath, section)
+        } else {
+            IniDelete(configPath, section)
+        }
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
     }
 }
 
 ConfigDeleteSection(configName, section) {
-    try IniDelete(GetConfigPath(configName), section)
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        IniDelete(configPath, section)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
 }
 
 ConfigReadSections(configName) {
@@ -267,29 +453,79 @@ ConfigWritePromptData(promptData) {
 }
 
 ConfigReadHotstringData() {
+    schemaVer := ConfigReadValue("Hotstrings", "Meta", "SchemaVersion", "1")
+    if (schemaVer == "4")
+        return ConfigReadHotstringDataV4()
+    return ConfigReadHotstringDataLegacy()
+}
+
+ConfigReadHotstringDataV4() {
+    localData := Map()
+    groupOrder := []
+    groupCount := ConfigReadIntegerValue("Hotstrings", "Groups", "Count", 0)
+
+    loop groupCount {
+        groupNo := Format("{:03}", A_Index)
+        groupId := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Id", "Group" . groupNo)
+        groupType := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Type", "Space")
+        groupName := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Name", "Default")
+        groupSection := HotstringMakeRuntimeSection(groupType, HotstringDecodeIniValue(groupName))
+
+        if (localData.Has(groupSection))
+            groupSection := HotstringMakeRuntimeSection(groupType, HotstringDecodeIniValue(groupName) . "_" . groupId)
+
+        localData[groupSection] := []
+        groupOrder.Push(groupSection)
+
+        itemCount := ConfigReadIntegerValue("Hotstrings", groupId, "ItemCount", 0)
+        loop itemCount {
+            itemNo := Format("{:03}", A_Index)
+            triggerText := HotstringDecodeIniValue(ConfigReadValue("Hotstrings", groupId, "Item" . itemNo . "Key", ""))
+            replacementText := HotstringDecodeIniValue(ConfigReadValue("Hotstrings", groupId, "Item" . itemNo . "Val", ""))
+            if (triggerText != "" && replacementText != "") {
+                localData[groupSection].Push({ Key: triggerText, Val: replacementText })
+            }
+        }
+    }
+
+    if (localData.Count == 0) {
+        localData["Group_Space_Default"] := []
+        groupOrder.Push("Group_Space_Default")
+    }
+
+    return { Data: localData, GroupOrder: groupOrder }
+}
+
+ConfigReadHotstringDataLegacy() {
     localData := Map()
     groupOrder := []
     discoveredOrder := []
+    legacySectionMap := Map()
     sections := ConfigReadSections("Hotstrings")
 
     if (sections != "") {
         loop parse, sections, "`n", "`r" {
-            secName := Trim(A_LoopField)
-            if (secName == "" || secName == "Meta" || secName == "GroupOrder")
-                continue
-            if (SubStr(secName, 1, 12) != "Group_Space_" && SubStr(secName, 1, 11) != "Group_Menu_")
+            legacySectionName := Trim(A_LoopField)
+            if (legacySectionName == "" || legacySectionName == "Meta" || legacySectionName == "GroupOrder")
                 continue
 
-            localData[secName] := []
-            discoveredOrder.Push(secName)
+            runtimeSection := HotstringMapLegacySection(legacySectionName)
+            if (runtimeSection == "")
+                continue
 
-            content := ConfigReadSection("Hotstrings", secName, "")
+            legacySectionMap[legacySectionName] := runtimeSection
+            if (!localData.Has(runtimeSection)) {
+                localData[runtimeSection] := []
+                discoveredOrder.Push(runtimeSection)
+            }
+
+            content := ConfigReadSection("Hotstrings", legacySectionName, "")
             if (content != "") {
                 loop parse, content, "`n", "`r" {
                     pair := ParseIniKeyValuePairs(A_LoopField)
-                    if (pair.Key != "") {
+                    if (pair.Key != "" && pair.Val != "") {
                         fixed := FixIniSpecialChars(pair.Key, pair.Val)
-                        localData[secName].Push({ Key: fixed.Key, Val: StrReplace(fixed.Val, "\n", "`n") })
+                        localData[runtimeSection].Push({ Key: fixed.Key, Val: StrReplace(fixed.Val, "\n", "`n") })
                     }
                 }
             }
@@ -299,15 +535,18 @@ ConfigReadHotstringData() {
     savedOrder := ConfigReadValue("Hotstrings", "GroupOrder", "Order", "")
     if (savedOrder != "") {
         loop parse, savedOrder, "," {
-            secName := Trim(A_LoopField)
-            if (secName != "" && localData.Has(secName))
-                groupOrder.Push(secName)
+            oldSecName := Trim(A_LoopField)
+            if (oldSecName == "")
+                continue
+            groupSection := legacySectionMap.Has(oldSecName) ? legacySectionMap[oldSecName] : HotstringMapLegacySection(oldSecName)
+            if (groupSection != "" && localData.Has(groupSection) && !ConfigArrayHasValue(groupOrder, groupSection))
+                groupOrder.Push(groupSection)
         }
     }
 
-    for secName in discoveredOrder {
-        if !ConfigArrayHasValue(groupOrder, secName)
-            groupOrder.Push(secName)
+    for groupSection in discoveredOrder {
+        if !ConfigArrayHasValue(groupOrder, groupSection)
+            groupOrder.Push(groupSection)
     }
 
     if (localData.Count == 0) {
@@ -319,38 +558,140 @@ ConfigReadHotstringData() {
 }
 
 ConfigWriteHotstringData(localData, groupOrder) {
-    ConfigWriteValue("Hotstrings", "Meta", "SchemaVersion", "3")
+    configPath := GetConfigPath("Hotstrings")
+    fullRollbackPath := ConfigCreateRollbackCopy(configPath)
 
-    sections := ConfigReadSections("Hotstrings")
-    if (sections != "") {
-        loop parse, sections, "`n", "`r" {
-            secName := Trim(A_LoopField)
-            if (secName != "" && secName != "Meta")
-                ConfigDeleteSection("Hotstrings", secName)
+    try {
+        sections := ConfigReadSections("Hotstrings")
+        if (sections != "") {
+            loop parse, sections, "`n", "`r" {
+                sectionName := Trim(A_LoopField)
+                if (sectionName != "" && sectionName != "Meta")
+                    ConfigDeleteSection("Hotstrings", sectionName)
+            }
         }
-    }
 
-    for secName in groupOrder {
-        if !localData.Has(secName)
+        ConfigWriteValue("Hotstrings", "Meta", "SchemaVersion", "4")
+
+        groupDefs := []
+        for groupSection in groupOrder {
+            if !localData.Has(groupSection)
+                continue
+
+            groupType := HotstringGetRuntimeGroupType(groupSection)
+            groupName := HotstringGetRuntimeGroupName(groupSection)
+            if (groupName == "")
+                groupName := "Default"
+
+            itemCount := 0
+            itemContent := ""
+            for item in localData[groupSection] {
+                triggerText := Trim(item.Key)
+                replacementText := Trim(item.Val)
+                if (triggerText == "" || replacementText == "")
+                    continue
+                itemCount++
+                itemNo := Format("{:03}", itemCount)
+                itemContent .= "Item" . itemNo . "Key=" . HotstringEncodeIniValue(triggerText) . "`n"
+                itemContent .= "Item" . itemNo . "Val=" . HotstringEncodeIniValue(replacementText) . "`n"
+            }
+            groupDefs.Push({ Type: groupType, Name: groupName, ItemContent: "ItemCount=" . itemCount . "`n" . itemContent })
+        }
+
+        if (groupDefs.Length == 0)
+            groupDefs.Push({ Type: "Space", Name: "Default", ItemContent: "ItemCount=0`n" })
+
+        groupsContent := "Count=" . groupDefs.Length . "`n"
+        for idx, groupDef in groupDefs {
+            groupNo := Format("{:03}", idx)
+            groupId := "Group" . groupNo
+            groupsContent .= "Group" . groupNo . "Id=" . groupId . "`n"
+            groupsContent .= "Group" . groupNo . "Type=" . groupDef.Type . "`n"
+            groupsContent .= "Group" . groupNo . "Name=" . HotstringEncodeIniValue(groupDef.Name) . "`n"
+            ConfigWriteSection("Hotstrings", groupId, groupDef.ItemContent)
+        }
+        ConfigWriteSection("Hotstrings", "Groups", groupsContent)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, fullRollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(fullRollbackPath)
+    }
+}
+
+ConfigReadIntegerValue(configName, section, key, defaultValue := 0) {
+    val := ConfigReadValue(configName, section, key, defaultValue)
+    try {
+        return Integer(val)
+    } catch {
+        return defaultValue
+    }
+}
+
+HotstringMapLegacySection(sectionName) {
+    if (SubStr(sectionName, 1, 12) == "Group_Space_")
+        return sectionName
+    if (SubStr(sectionName, 1, 11) == "Group_Menu_")
+        return sectionName
+    if (SubStr(sectionName, 1, 11) == "Group_Auto_")
+        return "Group_Space_" . SubStr(sectionName, 12)
+    if (SubStr(sectionName, 1, 6) == "Group_")
+        return "Group_Space_" . SubStr(sectionName, 7)
+    if (sectionName == "AutoReplace" || sectionName == "SpaceReplace")
+        return "Group_Space_Default"
+    return ""
+}
+
+HotstringMakeRuntimeSection(groupType, groupName) {
+    normalizedType := (StrLower(Trim(groupType)) == "menu") ? "Menu" : "Space"
+    normalizedName := Trim(groupName)
+    if (normalizedName == "")
+        normalizedName := "Default"
+    return "Group_" . normalizedType . "_" . normalizedName
+}
+
+HotstringGetRuntimeGroupType(groupSection) {
+    if (SubStr(groupSection, 1, 11) == "Group_Menu_")
+        return "Menu"
+    return "Space"
+}
+
+HotstringGetRuntimeGroupName(groupSection) {
+    if (SubStr(groupSection, 1, 12) == "Group_Space_")
+        return SubStr(groupSection, 13)
+    if (SubStr(groupSection, 1, 11) == "Group_Menu_")
+        return SubStr(groupSection, 12)
+    return groupSection
+}
+
+HotstringEncodeIniValue(value) {
+    value := StrReplace(value, "%", "%25")
+    value := StrReplace(value, "`r", "%0D")
+    value := StrReplace(value, "`n", "%0A")
+    return value
+}
+
+HotstringDecodeIniValue(value) {
+    value := StrReplace(value, "%0D", "`r")
+    value := StrReplace(value, "%0A", "`n")
+    value := StrReplace(value, "%25", "%")
+    return value
+}
+
+ConfigCountHotstrings() {
+    counts := { Space: 0, Menu: 0, Total: 0 }
+    hotstringData := ConfigReadHotstringData()
+    for groupSection in hotstringData.GroupOrder {
+        if !hotstringData.Data.Has(groupSection)
             continue
-
-        content := ""
-        for item in localData[secName] {
-            content .= item.Key . "=" . item.Val . "`n"
-        }
-        if (content == "")
-            content := "; Empty group`n"
-        ConfigWriteSection("Hotstrings", secName, content)
+        itemCount := hotstringData.Data[groupSection].Length
+        if (HotstringGetRuntimeGroupType(groupSection) == "Menu")
+            counts.Menu += itemCount
+        else
+            counts.Space += itemCount
+        counts.Total += itemCount
     }
-
-    orderStr := ""
-    for secName in groupOrder {
-        orderStr .= secName . ","
-    }
-    if (orderStr != "") {
-        orderStr := SubStr(orderStr, 1, -1)
-        ConfigWriteValue("Hotstrings", "GroupOrder", "Order", orderStr)
-    }
+    return counts
 }
 
 ConfigReadKeyRemaps() {
@@ -432,49 +773,108 @@ GetDefaultHotkeyData() {
 
 GetDefaultHotstringData() {
     return "[Meta]`n"
-    . "SchemaVersion=3`n`n"
-    . "[Group_Space_Bullets_Indicators]`n"
-    . "z.z=▣`n"
-    . "x.x=※`n"
-    . "c.c=⊙`n"
-    . "***.=★`n"
-    . "**.=☆`n"
-    . "v.v=✓`n"
-    . "q.q=☑`n"
-    . "r.r=☞`n`n"
-    . "[Group_Space_Math]`n"
-    . "d.d=Δ`n"
-    . "+-=±`n"
-    . "!==≠`n"
-    . ">==≥`n"
-    . "<==≤`n`n"
-    . "[Group_Space_Arrows]`n"
-    . ">>=→`n"
-    . "<<=←`n"
-    . "0++=↑`n"
-    . "0--=↓`n"
-    . "<->=↔`n"
-    . "t.t=▶`n"
-    . "y.y=▷`n`n"
-    . "[Group_Space_Currency]`n"
-    . "_usd=$`n"
-    . "_eur=€`n"
-    . "_gbp=£`n"
-    . "_chf=₣`n"
-    . "_pln=zł`n"
-    . "_czk=Kč`n"
-    . "_huf=Ft`n"
-    . "_ron=lei`n"
-    . "_bgn=лв`n"
-    . "_try=₺`n"
-    . "_rub=₽`n"
-    . "_krw=₩`n`n"
-    . "[Group_Space_For_Email]`n"
-    . "_br=Best regards,`n"
-    . "_tr=Thanks and regards,`n"
-    . "_fyi=For your information,`n"
-    . "_fya=For your action,`n"
-    . "_asap=as soon as possible"
+    . "SchemaVersion=4`n`n"
+    . "[Groups]`n"
+    . "Count=5`n"
+    . "Group001Id=Group001`n"
+    . "Group001Type=Space`n"
+    . "Group001Name=Bullets_Indicators`n"
+    . "Group002Id=Group002`n"
+    . "Group002Type=Space`n"
+    . "Group002Name=Math`n"
+    . "Group003Id=Group003`n"
+    . "Group003Type=Space`n"
+    . "Group003Name=Arrows`n"
+    . "Group004Id=Group004`n"
+    . "Group004Type=Space`n"
+    . "Group004Name=Currency`n"
+    . "Group005Id=Group005`n"
+    . "Group005Type=Space`n"
+    . "Group005Name=For_Email`n`n"
+    . "[Group001]`n"
+    . "ItemCount=8`n"
+    . "Item001Key=z.z`n"
+    . "Item001Val=▣`n"
+    . "Item002Key=x.x`n"
+    . "Item002Val=※`n"
+    . "Item003Key=c.c`n"
+    . "Item003Val=⊙`n"
+    . "Item004Key=***.`n"
+    . "Item004Val=★`n"
+    . "Item005Key=**.`n"
+    . "Item005Val=☆`n"
+    . "Item006Key=v.v`n"
+    . "Item006Val=✓`n"
+    . "Item007Key=q.q`n"
+    . "Item007Val=☑`n"
+    . "Item008Key=r.r`n"
+    . "Item008Val=☞`n`n"
+    . "[Group002]`n"
+    . "ItemCount=5`n"
+    . "Item001Key=d.d`n"
+    . "Item001Val=Δ`n"
+    . "Item002Key=+-`n"
+    . "Item002Val=±`n"
+    . "Item003Key=!=`n"
+    . "Item003Val=≠`n"
+    . "Item004Key=>=`n"
+    . "Item004Val=≥`n"
+    . "Item005Key=<=`n"
+    . "Item005Val=≤`n`n"
+    . "[Group003]`n"
+    . "ItemCount=7`n"
+    . "Item001Key=>>`n"
+    . "Item001Val=→`n"
+    . "Item002Key=<<`n"
+    . "Item002Val=←`n"
+    . "Item003Key=0++`n"
+    . "Item003Val=↑`n"
+    . "Item004Key=0--`n"
+    . "Item004Val=↓`n"
+    . "Item005Key=<->`n"
+    . "Item005Val=↔`n"
+    . "Item006Key=t.t`n"
+    . "Item006Val=▶`n"
+    . "Item007Key=y.y`n"
+    . "Item007Val=▷`n`n"
+    . "[Group004]`n"
+    . "ItemCount=12`n"
+    . "Item001Key=_usd`n"
+    . "Item001Val=$`n"
+    . "Item002Key=_eur`n"
+    . "Item002Val=€`n"
+    . "Item003Key=_gbp`n"
+    . "Item003Val=£`n"
+    . "Item004Key=_chf`n"
+    . "Item004Val=₣`n"
+    . "Item005Key=_pln`n"
+    . "Item005Val=zł`n"
+    . "Item006Key=_czk`n"
+    . "Item006Val=Kč`n"
+    . "Item007Key=_huf`n"
+    . "Item007Val=Ft`n"
+    . "Item008Key=_ron`n"
+    . "Item008Val=lei`n"
+    . "Item009Key=_bgn`n"
+    . "Item009Val=лв`n"
+    . "Item010Key=_try`n"
+    . "Item010Val=₺`n"
+    . "Item011Key=_rub`n"
+    . "Item011Val=₽`n"
+    . "Item012Key=_krw`n"
+    . "Item012Val=₩`n`n"
+    . "[Group005]`n"
+    . "ItemCount=5`n"
+    . "Item001Key=_br`n"
+    . "Item001Val=Best regards,`n"
+    . "Item002Key=_tr`n"
+    . "Item002Val=Thanks and regards,`n"
+    . "Item003Key=_fyi`n"
+    . "Item003Val=For your information,`n"
+    . "Item004Key=_fya`n"
+    . "Item004Val=For your action,`n"
+    . "Item005Key=_asap`n"
+    . "Item005Val=as soon as possible"
 }
 
 GetDefaultKeyRemapData() {

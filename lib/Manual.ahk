@@ -1,5 +1,5 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Theme.ahk
 OpenAppManual(lang := "EN", parentHwnd := 0) {
     mGui := Gui("+AlwaysOnTop +Resize -MaximizeBox", "App Manual")
     if (parentHwnd)

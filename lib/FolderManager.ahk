@@ -1,5 +1,7 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Theme.ahk
+#Include Utils.ahk
 
 ; =================================================================================
 ; Module: FolderManager
@@ -45,8 +47,9 @@ class FolderManager {
         guiObj.SetFont("c" . THEME_TEXT)
 
         btnAddDir := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 25) . " w85 h35", "➕ New")
-        btnSep := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 65) . " w85 h35", "➖ Separator")
-        btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 105) . " w85 h35", "❌ Delete")
+        btnEdit := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 65) . " w85 h35", "✏️ Edit")
+        btnSep := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 105) . " w85 h35", "➖ Separator")
+        btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 145) . " w85 h35", "❌ Delete")
 
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
         btnUp := guiObj.Add("Text", "x" . (startX + 320) . " y" . (startY + 290) . " w85 h35 Center +0x200 +Border Background000000", "▲ Up")
@@ -70,7 +73,9 @@ class FolderManager {
 
         this.RefreshList()
 
+        this.lbItems.OnEvent("DoubleClick", (*) => this.EditFolder())
         btnAddDir.OnEvent("Click", (*) => this.AddFolder())
+        btnEdit.OnEvent("Click", (*) => this.EditFolder())
         btnSep.OnEvent("Click", (*) => this.AddSeparator())
         btnDel.OnEvent("Click", (*) => this.DeleteItem())
         btnUp.OnEvent("Click", (*) => this.MoveItem(-1))
@@ -133,8 +138,85 @@ class FolderManager {
     }
 
     AddFolderItem(folderName, folderPath) {
+        folderName := Trim(folderName)
+        if (!IsPlainIniKeySafe(folderName)) {
+            MsgBox("⚠️ Folder name cannot contain '=' or line breaks.`nPlease use a simpler nickname.", "Invalid Folder Name", 262192)
+            return false
+        }
         this.orderedItems.Push({ Name: folderName, Path: folderPath })
         this.RefreshList(this.orderedItems.Length)
+        return true
+    }
+
+    EditFolder() {
+        idx := this.lbItems.Value
+        if (idx == 0)
+            return
+
+        item := this.orderedItems[idx]
+        if (item.Name == "-") {
+            MsgBox("⚠️ Separator cannot be edited.", "Info", 262208)
+            return
+        }
+
+        WinSetEnabled(0, this.mainHwnd)
+        popup := Gui("+AlwaysOnTop +Owner" . this.mainHwnd . " -MinimizeBox -MaximizeBox", "Edit Folder")
+
+        CleanUpAndClose() {
+            WinSetEnabled(1, this.mainHwnd)
+            WinActivate(this.mainHwnd)
+            popup.Destroy()
+        }
+        popup.OnEvent("Close", (*) => CleanUpAndClose())
+        popup.BackColor := "FFFFFF"
+        popup.SetFont("s10 cBlack", "Segoe UI")
+
+        popup.Add("GroupBox", "x15 y10 w400 h80 cBlack", "Folder Name (Nickname)")
+        edtName := popup.Add("Edit", "x30 y35 w370 h30", item.Name)
+
+        popup.Add("GroupBox", "x15 y100 w400 h80 cBlack", "Folder Path")
+        edtPath := popup.Add("Edit", "x30 y125 w300 h30", item.Path)
+        btnBrowse := popup.Add("Button", "x340 y124 w60 h32", "Browse")
+
+        btnBrowse.OnEvent("Click", (*) => OnBrowse())
+        OnBrowse() {
+            popup.Opt("-AlwaysOnTop")
+            selectedDir := DirSelect("*" . edtPath.Value, 3, "Select a folder")
+            popup.Opt("+AlwaysOnTop")
+            if (selectedDir != "")
+                edtPath.Value := selectedDir
+        }
+
+        popup.SetFont("s10 cWhite bold", "Segoe UI")
+        btnConfirm := popup.Add("Text", "x215 y200 w200 h35 Center +0x200 +Border Background0078D7", "💾 Save Changes")
+        popup.SetFont("s10 cBlack norm", "Segoe UI")
+        btnConfirm.OnEvent("Click", (*) => OnConfirm())
+
+        btnCancel := popup.Add("Button", "x15 y200 w190 h35", "Cancel")
+        btnCancel.OnEvent("Click", (*) => CleanUpAndClose())
+
+        OnConfirm() {
+            n := Trim(edtName.Value)
+            p := Trim(edtPath.Value)
+            if (n == "" || p == "") {
+                MsgBox("⚠️ Please enter both folder name and path.", "Warning", 262192)
+                return
+            }
+            if (!IsPlainIniKeySafe(n)) {
+                MsgBox("⚠️ Folder name cannot contain '=' or line breaks.`nPlease use a simpler nickname.", "Invalid Folder Name", 262192)
+                return
+            }
+
+            this.orderedItems[idx].Name := n
+            this.orderedItems[idx].Path := p
+
+            this.RefreshList(idx)
+            CleanUpAndClose()
+            ToolTip("✅ Modified. Click Save & Apply.")
+            SetTimer(() => ToolTip(), -2000)
+        }
+
+        popup.Show("w430 h250")
     }
 
     AddFolder() {
@@ -178,7 +260,7 @@ class FolderManager {
             WinSetAlwaysOnTop(1, this.rGui.Hwnd)
         }
 
-        if (ib.Result != "OK" || ib.Value == "")
+        if (ib.Result != "OK" || Trim(ib.Value) == "")
             return
 
         this.AddFolderItem(ib.Value, selectedDir)

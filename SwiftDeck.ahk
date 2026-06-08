@@ -1,9 +1,38 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName SwiftDeck
-;@Ahk2Exe-SetVersion 8.1.0.0
+;@Ahk2Exe-SetVersion 8.1.1.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
 ;@Ahk2Exe-SetMainIcon SwiftDeck.ico
+
+; =============================================================================
+; SECTION: Global Configuration
+; =============================================================================
+
+; [Global] Display version shown in the app UI
+global g_appVersion := "8.1.1"
+
+; [Global] Path configuration (migrate legacy folder name)
+if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
+    try DirMove(A_AppData . "\AHK_FolderHotKey", A_AppData . "\SwiftDeck", 1)
+}
+global g_targetFolder := A_AppData . "\SwiftDeck\"
+
+; [Global] Config file names
+global g_fileName_Folder := "App02_01FavFolderSetting_v2_DoNotDelete.ini"
+global g_fileName_Hotkey := "App02_02HotkeySetting_v2_DoNotDelete.ini"
+global g_fileName_Hotstring := "App02_03HotstringSetting_DoNotDelete.ini"
+global g_fileName_KeyRemap := "App02_04KeyRemap_DoNotDelete.ini"
+
+; [Global] Full config file paths
+global g_filePath_Folder := g_targetFolder . g_fileName_Folder
+global g_filePath_Hotkey := g_targetFolder . g_fileName_Hotkey
+global g_filePath_Hotstring := g_targetFolder . g_fileName_Hotstring
+global g_filePath_KeyRemap := g_targetFolder . g_fileName_KeyRemap
+
+; [Global] Runtime state
+global g_registeredHotstrings := []
+global g_registeredKeyRemaps := Map()
 
 ; =============================================================================
 ; SECTION: Tray Icon
@@ -32,49 +61,18 @@ if FileExist(A_ScriptDir . "\SwiftDeck.ico") {
 #Include %A_ScriptDir%/lib/AppInfo.ahk
 #Include %A_ScriptDir%/lib/Manual.ahk
 
-; [Global] App version
-global g_appVersion := "8.1"
-
-; [Global] Path configuration (migrate legacy folder name)
-if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
-    try DirMove(A_AppData . "\AHK_FolderHotKey", A_AppData . "\SwiftDeck", 1)
-}
-global g_targetFolder := A_AppData . "\SwiftDeck\"
-
-; [Global] Config file names (used for backup/restore path construction)
-global g_fileName_Folder := "App02_01FavFolderSetting_v2_DoNotDelete.ini"
-global g_fileName_Hotkey := "App02_02HotkeySetting_v2_DoNotDelete.ini"
-global g_fileName_Hotstring := "App02_03HotstringSetting_DoNotDelete.ini"
-global g_fileName_KeyRemap := "App02_04KeyRemap_DoNotDelete.ini"
-
-; [Global] Full config file paths (used for data read/write)
-global g_filePath_Folder := g_targetFolder . g_fileName_Folder
-global g_filePath_Hotkey := g_targetFolder . g_fileName_Hotkey
-global g_filePath_Hotstring := g_targetFolder . g_fileName_Hotstring
-global g_filePath_KeyRemap := g_targetFolder . g_fileName_KeyRemap
-
-; [Global] Runtime state
-global g_registeredHotstrings := []
-global g_registeredKeyRemaps := Map()
-
 ; =============================================================================
 ; SECTION: Application Startup
 ; =============================================================================
 OnStartup() ; Invoked immediately on script start
 
 OnStartup() {
-    global g_fileName_Folder, g_fileName_Hotkey, g_fileName_Hotstring, g_fileName_KeyRemap, g_targetFolder, g_filePath_Folder
+    isFirstRun := ConfigIsFirstRun()
 
-    ; Check if this is the first run (no config file = first run)
-    isFirstRun := !FileExist(g_filePath_Folder)
+    InitializeAllConfigs()
 
-    ; Initialize config files (create from defaults if missing)
-    InitializeConfig(g_fileName_Folder, GetDefaultFolderData())
-    InitializeConfig(g_fileName_Hotkey, GetDefaultHotkeyData())
-    InitializeConfig(g_fileName_Hotstring, GetDefaultHotstringData())
-    InitializeConfig(g_fileName_KeyRemap, GetDefaultKeyRemapData())
-
-    ; Run legacy config migration
+    ; Run config migrations
+    MigrateIniEncoding()
     MigrateHotstringIni()
 
     ; Normalize old hotkey settings such as "WinNumpad"
@@ -143,8 +141,6 @@ BindPrompt(num) {
 }
 
 SetupTrayMenu(hotkeyLabel := "F1") {
-    global g_targetFolder
-
     A_TrayMenu.Delete() ; Remove default AHK tray items (Open, Pause, Exit, etc.)
 
     formattedHK := FormatHotkeyDisplay(hotkeyLabel)
@@ -152,7 +148,7 @@ SetupTrayMenu(hotkeyLabel := "F1") {
     A_TrayMenu.Add("📂 Open Folders Menu (" . formattedHK . ")", (*) => ShowFavoritesMenu())
     A_TrayMenu.Add()
     A_TrayMenu.Add("⚙️ App Settings", (*) => DashboardManager.Show(1))
-    A_TrayMenu.Add("📁 Open Settings Folder", (*) => Run("explorer.exe `"" . g_targetFolder . "`""))
+    A_TrayMenu.Add("📁 Open Settings Folder", (*) => RunSafely("explorer.exe `"" . ConfigGetSettingsFolder() . "`"", "Open Settings Folder"))
     A_TrayMenu.Add("📘 Open App Manual", (*) => OpenAppManual("EN"))
     A_TrayMenu.Add("ℹ️ App Information", (*) => ShowAppInformation())
     A_TrayMenu.Add()

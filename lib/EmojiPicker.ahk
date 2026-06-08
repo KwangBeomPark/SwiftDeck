@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Utils.ahk
 ; =================================================================================
 ; --- Emoji & Symbol Popup Menu (Emoji Picker) ---
 ; =================================================================================
@@ -10,55 +11,45 @@ BuildEmojiMenu() {
     global g_emojiMenu
     g_emojiMenu.Delete()
 
-    SendEmoji(ItemName, ItemPos, MyMenu) {
-        ; If "  [" pattern exists, use everything before it as the symbol
-        idx := InStr(ItemName, "  [")
-        if (idx > 0) {
-            symbol := SubStr(ItemName, 1, idx - 1)
-        } else {
-            arr := StrSplit(ItemName, " ")
-            symbol := arr[1]
-        }
-        SendText(symbol)
+    SendMenuText(text, ItemName, ItemPos, MyMenu) {
+        SendText(text)
+    }
+
+    SafeMenuLabel(text, fallback := "Item") {
+        label := StrReplace(text, "`r`n", " ")
+        label := StrReplace(label, "`r", " ")
+        label := StrReplace(label, "`n", " ")
+        label := Trim(label)
+        if (label == "")
+            label := fallback
+        if (StrLen(label) > 60)
+            label := SubStr(label, 1, 60) . "..."
+        return label
     }
 
     ; User Hotstring & Menu Groups
     if ConfigExists("Hotstrings") {
-        sections := ""
-        try sections := ConfigReadSections("Hotstrings")
-        if (sections != "") {
-            groupIndex := 1
-            loop parse, sections, "`n", "`r" {
-                secName := Trim(A_LoopField)
-                if (secName == "" || secName == "Meta")
-                    continue
+        hotstringData := ConfigReadHotstringData()
+        groupIndex := 1
+        for secName in hotstringData.GroupOrder {
+            if !hotstringData.Data.Has(secName)
+                continue
 
-                displayName := ""
-                if (SubStr(secName, 1, 12) == "Group_Space_") {
-                    displayName := SubStr(secName, 13)
-                } else if (SubStr(secName, 1, 11) == "Group_Menu_") {
-                    displayName := SubStr(secName, 12)
-                } else {
-                    continue
-                }
-
-                pairs := ""
-                try pairs := ConfigReadSection("Hotstrings", secName, "")
-                if (pairs == "")
-                    continue
-
-                mUserGroup := Menu()
-                hasItems := false
-                loop parse, pairs, "`n", "`r" {
-                    pair := ParseIniKeyValuePairs(A_LoopField)
-                    if (pair.Key != "" && pair.Val != "") {
-                        fixed := FixIniSpecialChars(pair.Key, pair.Val)
-                        mUserGroup.Add(fixed.Val . "  [" . fixed.Key . "]", SendEmoji)
+            displayName := SafeMenuLabel(HotstringGetRuntimeGroupName(secName), "Unnamed Group")
+            mUserGroup := Menu()
+            hasItems := false
+            for item in hotstringData.Data[secName] {
+                if (item.Key != "" && item.Val != "") {
+                    itemLabel := SafeMenuLabel(item.Val, "Text") . "  [" . SafeMenuLabel(item.Key, "Trigger") . "]"
+                    try {
+                        mUserGroup.Add(itemLabel, SendMenuText.Bind(item.Val))
                         hasItems := true
                     }
                 }
+            }
 
-                if (hasItems) {
+            if (hasItems) {
+                try {
                     g_emojiMenu.Add(groupIndex . "️⃣ " . displayName, mUserGroup)
                     groupIndex++
                 }

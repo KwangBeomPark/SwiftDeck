@@ -1,5 +1,8 @@
 #Requires AutoHotkey v2.0
-;@disable-check undeclared
+#Include Config.ahk
+#Include Theme.ahk
+#Include FolderManager.ahk
+; Runtime global g_appVersion is initialized in SwiftDeck.ahk before this module is included.
 
 ; =================================================================================
 ; Module: AppInfo
@@ -7,7 +10,7 @@
 ; Author: KBPark (Financial Specialist)
 ; =================================================================================
 ShowAppInformation(parentHwnd := 0) {
-    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_targetFolder, g_filePath_KeyRemap, g_appVersion
+    global g_appVersion
 
     bmcBtnPath := A_ScriptDir . "\bmc_button.png"
     if !FileExist(bmcBtnPath) {
@@ -15,6 +18,10 @@ ShowAppInformation(parentHwnd := 0) {
             Download("https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png", bmcBtnPath)
         }
     }
+    settingsFolder := ConfigGetSettingsFolder()
+    favoriteConfigPath := GetConfigPath("Folders")
+    promptConfigPath := GetConfigPath("Prompts")
+    hotstringConfigPath := GetConfigPath("Hotstrings")
 
     if (parentHwnd) {
         WinSetEnabled(0, parentHwnd)
@@ -33,7 +40,7 @@ ShowAppInformation(parentHwnd := 0) {
 
     if FileExist(A_ScriptDir . "\github_icon.png") {
         picGithub := infoGui.Add("Picture", "x380 y15 w80 h80 BackgroundTrans", A_ScriptDir . "\github_icon.png")
-        picGithub.OnEvent("Click", (*) => Run("https://github.com/KwangBeomPark"))
+        picGithub.OnEvent("Click", (*) => RunSafely("https://github.com/KwangBeomPark", "Open GitHub"))
     }
     infoGui.SetFont("s10 norm c" . THEME_TEXT, "Segoe UI")
 
@@ -51,20 +58,9 @@ ShowAppInformation(parentHwnd := 0) {
     hsSpaceCount := 0
     hsMenuCount := 0
     if ConfigExists("Hotstrings") {
-        sections := ConfigReadSections("Hotstrings")
-        if (sections != "") {
-            loop parse, sections, "`n", "`r" {
-                secName := Trim(A_LoopField)
-                if (secName == "" || secName == "Meta" || secName == "GroupOrder")
-                    continue
-
-                pairCount := ConfigCountPairs("Hotstrings", secName)
-                if (SubStr(secName, 1, 11) == "Group_Menu_")
-                    hsMenuCount += pairCount
-                else if (SubStr(secName, 1, 12) == "Group_Space_")
-                    hsSpaceCount += pairCount
-            }
-        }
+        hsCounts := ConfigCountHotstrings()
+        hsSpaceCount := hsCounts.Space
+        hsMenuCount := hsCounts.Menu
     }
     hsTotal := hsSpaceCount + hsMenuCount
 
@@ -93,7 +89,7 @@ ShowAppInformation(parentHwnd := 0) {
     infoGui.Add("GroupBox", "x245 y110 w215 h190 c" . THEME_ACCENT, "🛠️ Maintenance Tools")
 
     btnAppFolder := infoGui.Add("Button", "x260 y145 w185 h30", "📂 Open App Folder")
-    btnAppFolder.OnEvent("Click", (*) => Run("explorer.exe `"" . g_targetFolder . "`""))
+    btnAppFolder.OnEvent("Click", (*) => RunSafely("explorer.exe `"" . settingsFolder . "`"", "Open App Folder"))
 
     btnBackup := infoGui.Add("Button", "x260 y190 w90 h30", "📥 Backup")
     btnBackup.OnEvent("Click", (*) => BackupConfigs(true))
@@ -156,23 +152,23 @@ ShowAppInformation(parentHwnd := 0) {
     infoGui.SetFont("s9 c" . THEME_MUTED)
     infoGui.Add("Text", "x35 y335 w410", "Favorites Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y353 w345 h22 ReadOnly Background2D2D30 -Border", g_filePath_Folder)
+    infoGui.Add("Edit", "x35 y353 w345 h22 ReadOnly Background2D2D30 -Border", favoriteConfigPath)
     btnOpenFavFile := infoGui.Add("Button", "x390 y351 w55 h24", "Open")
-    btnOpenFavFile.OnEvent("Click", (*) => Run("notepad.exe `"" . g_filePath_Folder . "`""))
+    btnOpenFavFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . favoriteConfigPath . "`"", "Open Config File"))
 
     infoGui.SetFont("s9 c" . THEME_MUTED)
     infoGui.Add("Text", "x35 y378 w410", "Quick Prompts Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y396 w345 h22 ReadOnly Background2D2D30 -Border", g_filePath_Hotkey)
+    infoGui.Add("Edit", "x35 y396 w345 h22 ReadOnly Background2D2D30 -Border", promptConfigPath)
     btnOpenPrFile := infoGui.Add("Button", "x390 y394 w55 h24", "Open")
-    btnOpenPrFile.OnEvent("Click", (*) => Run("notepad.exe `"" . g_filePath_Hotkey . "`""))
+    btnOpenPrFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . promptConfigPath . "`"", "Open Config File"))
 
     infoGui.SetFont("s9 c" . THEME_MUTED)
     infoGui.Add("Text", "x35 y421 w410", "Hotstrings Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y439 w345 h22 ReadOnly Background2D2D30 -Border", g_filePath_Hotstring)
+    infoGui.Add("Edit", "x35 y439 w345 h22 ReadOnly Background2D2D30 -Border", hotstringConfigPath)
     btnOpenHsFile := infoGui.Add("Button", "x390 y437 w55 h24", "Open")
-    btnOpenHsFile.OnEvent("Click", (*) => Run("notepad.exe `"" . g_filePath_Hotstring . "`""))
+    btnOpenHsFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . hotstringConfigPath . "`"", "Open Config File"))
     infoGui.SetFont("s10 c" . THEME_TEXT)
 
     ; 4. Support Developer Section (Very Bottom)
@@ -181,11 +177,11 @@ ShowAppInformation(parentHwnd := 0) {
 
     if FileExist(bmcBtnPath) {
         picCoffee := infoGui.Add("Picture", "x130 y520 w217 h60 BackgroundTrans", bmcBtnPath)
-        picCoffee.OnEvent("Click", (*) => Run("https://www.buymeacoffee.com/KBPark_Bob"))
+        picCoffee.OnEvent("Click", (*) => RunSafely("https://www.buymeacoffee.com/KBPark_Bob", "Open Support Page"))
     } else {
         infoGui.SetFont("s11 cBlack bold", "Segoe UI")
         btnCoffee := infoGui.Add("Text", "x130 y525 w220 h45 Center +0x200 +Border BackgroundFF813F", "☕ Buy Me a Coffee")
-        btnCoffee.OnEvent("Click", (*) => Run("https://www.buymeacoffee.com/KBPark_Bob"))
+        btnCoffee.OnEvent("Click", (*) => RunSafely("https://www.buymeacoffee.com/KBPark_Bob", "Open Support Page"))
         infoGui.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
     }
 
