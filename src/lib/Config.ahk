@@ -1,0 +1,900 @@
+#Requires AutoHotkey v2.0
+#Include Utils.ahk
+; NOTE: Global variables (g_targetFolder, g_filePath_*) are declared in SwiftDeck.ahk.
+; =============================================================================
+; --- Config File Initialization & Management ---
+; =============================================================================
+
+ConfigGetManagedFiles() {
+    global g_fileName_Folder, g_fileName_Hotkey, g_fileName_Hotstring, g_fileName_KeyRemap
+    global g_filePath_Folder, g_filePath_Hotkey, g_filePath_Hotstring, g_filePath_KeyRemap
+
+    return [
+        {
+            CanonicalName: "Folders",
+            Aliases: ["Settings", "Folders", "Favorites"],
+            FileName: g_fileName_Folder,
+            Path: g_filePath_Folder,
+            ResetTarget: "Favorites",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "Prompts",
+            Aliases: ["Prompts", "Hotkeys"],
+            FileName: g_fileName_Hotkey,
+            Path: g_filePath_Hotkey,
+            ResetTarget: "Prompts",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "Hotstrings",
+            Aliases: ["Hotstrings"],
+            FileName: g_fileName_Hotstring,
+            Path: g_filePath_Hotstring,
+            ResetTarget: "Hotstrings",
+            RequiredBackup: true
+        },
+        {
+            CanonicalName: "KeyRemaps",
+            Aliases: ["KeyRemaps", "Key Remaps"],
+            FileName: g_fileName_KeyRemap,
+            Path: g_filePath_KeyRemap,
+            ResetTarget: "Key Remaps",
+            RequiredBackup: false
+        }
+    ]
+}
+
+ConfigGetSettingsFolder() {
+    global g_targetFolder
+    return g_targetFolder
+}
+
+ConfigGetDefaultText(canonicalName) {
+    switch canonicalName {
+        case "Folders":
+            return GetDefaultFolderData()
+        case "Prompts":
+            return GetDefaultHotkeyData()
+        case "Hotstrings":
+            return GetDefaultHotstringData()
+        case "KeyRemaps":
+            return GetDefaultKeyRemapData()
+        default:
+            throw Error("Unknown default config: " . canonicalName)
+    }
+}
+
+ConfigManagedFileMatches(fileDef, configName) {
+    for aliasName in fileDef.Aliases {
+        if (aliasName == configName)
+            return true
+    }
+    return false
+}
+
+ConfigGetManagedFile(configName) {
+    for fileDef in ConfigGetManagedFiles() {
+        if ConfigManagedFileMatches(fileDef, configName)
+            return fileDef
+    }
+    throw Error("Unknown config file: " . configName)
+}
+
+ConfigIsFirstRun() {
+    return !FileExist(GetConfigPath("Folders"))
+}
+
+InitializeAllConfigs() {
+    for fileDef in ConfigGetManagedFiles() {
+        InitializeConfig(fileDef.FileName, ConfigGetDefaultText(fileDef.CanonicalName))
+    }
+}
+
+InitializeConfig(fileName, defaultText) {
+    global g_targetFolder
+
+    ConfigEnsureDir(g_targetFolder)
+
+    targetFile := g_targetFolder . fileName
+
+    if (FileExist(targetFile)) {
+        return
+    }
+
+    try {
+        ConfigWriteTextFileSafely(targetFile, defaultText, "UTF-16")
+    } catch Error as err {
+        MsgBox("⚠️ Cannot create file in the target drive.`n`nPath: " . targetFile . "`n`nError: " . err.Message, "Error", 262160)
+    }
+}
+
+BackupConfigs(showMsg := false) {
+    global g_targetFolder
+    backupDir := g_targetFolder . "Backups\"
+    ConfigEnsureDir(backupDir)
+
+    try {
+        for fileDef in ConfigGetManagedFiles() {
+            if (fileDef.RequiredBackup || FileExist(fileDef.Path))
+                FileCopy(fileDef.Path, ConfigGetBackupPath(backupDir, fileDef.Path), true)
+        }
+        if (showMsg)
+            MsgBox("✅ Settings have been backed up successfully.", "Backup Complete", 262208)
+    } catch {
+        if (showMsg)
+            MsgBox("❌ An error occurred during backup.", "Error", 262160)
+    }
+}
+
+RestoreConfigs() {
+    global g_targetFolder
+    backupDir := g_targetFolder . "Backups\"
+    managedFiles := ConfigGetManagedFiles()
+    requiredBackups := []
+    for fileDef in managedFiles {
+        if fileDef.RequiredBackup
+            requiredBackups.Push(ConfigGetBackupPath(backupDir, fileDef.Path))
+    }
+
+    missingBackups := ConfigListMissingFiles(requiredBackups)
+    if (missingBackups != "") {
+        MsgBox("❌ Cannot restore because required backup files are missing:`n`n" . missingBackups, "Restore Blocked", 262160)
+        return
+    }
+
+    msgRes := MsgBox(
+        "⚠️ Are you sure you want to restore the settings from the last backup?`nYour current settings will be overwritten.",
+        "Restore Backup", 262180)
+    if (msgRes != "Yes")
+        return
+
+    rollbackDir := g_targetFolder . "RestoreRollback_" . A_Now . "_" . A_TickCount . "\"
+    currentPaths := []
+    try {
+        ConfigEnsureDir(rollbackDir)
+        for fileDef in managedFiles {
+            currentPaths.Push(fileDef.Path)
+            ConfigBackupCurrentFileForRollback(rollbackDir, fileDef.Path)
+        }
+
+        for fileDef in managedFiles {
+            backupPath := ConfigGetBackupPath(backupDir, fileDef.Path)
+            if (fileDef.RequiredBackup || FileExist(backupPath))
+                FileCopy(backupPath, fileDef.Path, true)
+        }
+
+        ConfigDeleteDirQuietly(rollbackDir)
+        MsgBox("✅ Restoration complete. The app will now reload to apply changes.", "Restore Complete", 262208)
+        Reload()
+    } catch Error as err {
+        ConfigRestoreFilesFromRollback(rollbackDir, currentPaths)
+        ConfigDeleteDirQuietly(rollbackDir)
+        MsgBox("❌ Restore failed and current settings were rolled back.`n`nError: " . err.Message, "Restore Error", 262160)
+    }
+}
+
+ConfigGetBackupPath(backupDir, sourcePath) {
+    SplitPath(sourcePath, &fileName)
+    return backupDir . fileName . ".bak"
+}
+
+ConfigEnsureDir(dirPath) {
+    if (dirPath != "" && !DirExist(dirPath))
+        DirCreate(dirPath)
+}
+
+ConfigMakeTempPath(targetPath, tag := "tmp") {
+    SplitPath(targetPath, &fileName, &dirPath)
+    loop 50 {
+        tempPath := dirPath . "\" . fileName . "." . tag . "." . A_Now . "." . A_TickCount . "." . A_Index
+        if !FileExist(tempPath)
+            return tempPath
+    }
+    throw Error("Cannot create a temporary file path for: " . targetPath)
+}
+
+ConfigWriteTextFileSafely(targetPath, content, encoding := "UTF-16") {
+    SplitPath(targetPath, , &dirPath)
+    ConfigEnsureDir(dirPath)
+
+    tempPath := ConfigMakeTempPath(targetPath, "tmp")
+    rollbackPath := ""
+    maxRetries := 3
+    lastErr := ""
+
+    loop maxRetries {
+        try {
+            ; Write to a temp file first so a failed write does not destroy the current config.
+            if FileExist(tempPath)
+                FileDelete(tempPath)
+            FileAppend(content, tempPath, encoding)
+            if FileExist(targetPath)
+                rollbackPath := ConfigCreateRollbackCopy(targetPath)
+            FileMove(tempPath, targetPath, true)
+            ; Success — clean up and return
+            ConfigDeleteFileQuietly(rollbackPath)
+            ConfigDeleteFileQuietly(tempPath)
+            return
+        } catch Error as err {
+            lastErr := err
+            if (A_Index < maxRetries)
+                Sleep(100 * A_Index)  ; Exponential backoff: 100ms, 200ms, 300ms
+        }
+    }
+
+    ; All retries exhausted — restore rollback and propagate error
+    ConfigRestoreRollbackCopy(targetPath, rollbackPath)
+    ConfigDeleteFileQuietly(tempPath)
+    ConfigDeleteFileQuietly(rollbackPath)
+    throw lastErr
+}
+
+ConfigCreateRollbackCopy(targetPath) {
+    if !FileExist(targetPath)
+        return ""
+    rollbackPath := ConfigMakeTempPath(targetPath, "rollback")
+    FileCopy(targetPath, rollbackPath, true)
+    return rollbackPath
+}
+
+ConfigRestoreRollbackCopy(targetPath, rollbackPath) {
+    if (rollbackPath != "" && FileExist(rollbackPath))
+        try FileCopy(rollbackPath, targetPath, true)
+}
+
+ConfigDeleteFileQuietly(path) {
+    if (path != "" && FileExist(path))
+        try FileDelete(path)
+}
+
+ConfigDeleteDirQuietly(path) {
+    if (path != "" && DirExist(path))
+        try DirDelete(path, true)
+}
+
+ConfigListMissingFiles(paths) {
+    missing := ""
+    for path in paths {
+        if !FileExist(path)
+            missing .= path . "`n"
+    }
+    return RTrim(missing, "`n")
+}
+
+ConfigBackupCurrentFileForRollback(rollbackDir, sourcePath) {
+    if FileExist(sourcePath)
+        FileCopy(sourcePath, ConfigGetBackupPath(rollbackDir, sourcePath), true)
+}
+
+ConfigRestoreFilesFromRollback(rollbackDir, sourcePaths) {
+    for sourcePath in sourcePaths {
+        rollbackPath := ConfigGetBackupPath(rollbackDir, sourcePath)
+        if FileExist(rollbackPath)
+            try FileCopy(rollbackPath, sourcePath, true)
+    }
+}
+
+ResetToDefaults(target := "All") {
+    msg := ""
+    if (target == "All")
+        msg := "⚠️ Are you sure you want to FACTORY RESET ALL settings?`nAll your custom configurations will be deleted.`n(Backups will not be affected.)"
+    else
+        msg := "⚠️ Are you sure you want to reset " . target . " to default?`nYour current settings for this feature will be deleted.`n(Backups will not be affected.)"
+
+    if (MsgBox(msg, "Confirm Reset", 262452) != "Yes")
+        return
+
+    try {
+        for fileDef in ConfigGetManagedFiles() {
+            if (target == "All" || target == fileDef.ResetTarget)
+                ConfigWriteTextFileSafely(fileDef.Path, ConfigGetDefaultText(fileDef.CanonicalName), "UTF-16")
+        }
+        MsgBox("✅ Reset complete. The app will now reload.", "Success", 262208)
+        Reload()
+    } catch Error as err {
+        MsgBox("❌ An error occurred while resetting settings.`n`nError: " . err.Message, "Error", 262160)
+    }
+}
+
+; =============================================================================
+; SECTION: Central Config Gateway
+; =============================================================================
+GetConfigPath(configName) {
+    return ConfigGetManagedFile(configName).Path
+}
+
+ConfigExists(configName) {
+    return FileExist(GetConfigPath(configName))
+}
+
+ConfigReadValue(configName, section, key, defaultValue := "") {
+    try {
+        return IniRead(GetConfigPath(configName), section, key, defaultValue)
+    } catch {
+        return defaultValue
+    }
+}
+
+ConfigWriteValue(configName, section, key, value) {
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        IniWrite(value, configPath, section, key)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
+}
+
+ConfigReadSection(configName, section, defaultValue := "") {
+    try {
+        return IniRead(GetConfigPath(configName), section, , defaultValue)
+    } catch {
+        return defaultValue
+    }
+}
+
+ConfigWriteSection(configName, section, content) {
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        if (content != "") {
+            IniWrite(content, configPath, section)
+        } else {
+            IniDelete(configPath, section)
+        }
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
+}
+
+ConfigDeleteSection(configName, section) {
+    configPath := GetConfigPath(configName)
+    rollbackPath := ConfigCreateRollbackCopy(configPath)
+    try {
+        IniDelete(configPath, section)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, rollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(rollbackPath)
+    }
+}
+
+ConfigReadSections(configName) {
+    try {
+        return IniRead(GetConfigPath(configName))
+    } catch {
+        return ""
+    }
+}
+
+ConfigReadAppSettings() {
+    return {
+        MainHotkey: ConfigReadValue("Settings", "Settings", "MainHotkey", "F1"),
+        PromptModifier: ConfigReadValue("Settings", "Settings", "PromptModifier", "#"),
+        PromptUseNumpad: Integer(ConfigReadValue("Settings", "Settings", "PromptUseNumpad", "1")),
+        EmojiHotkey: ConfigReadValue("Settings", "Settings", "EmojiHotkey", "^#Space"),
+        ExitHotkey: ConfigReadValue("Settings", "Settings", "ExitHotkey", "^#Escape")
+    }
+}
+
+ConfigWriteAppSettings(mainHotkey, promptModifier, promptUseNumpad) {
+    ConfigWriteValue("Settings", "Settings", "MainHotkey", mainHotkey)
+    ConfigWriteValue("Settings", "Settings", "PromptModifier", promptModifier)
+    ConfigWriteValue("Settings", "Settings", "PromptUseNumpad", promptUseNumpad)
+}
+
+ConfigReadFolderItems() {
+    items := []
+    content := ConfigReadSection("Folders", "FolderMenu", "")
+
+    if (content != "") {
+        loop parse, content, "`n", "`r" {
+            pair := ParseIniKeyValuePairs(A_LoopField)
+            if (pair.Key != "")
+                items.Push({ Name: pair.Key, Path: pair.Val })
+        }
+    }
+
+    return items
+}
+
+ConfigWriteFolderItems(items) {
+    content := ""
+    for item in items {
+        content .= item.Name . "=" . item.Path . "`n"
+    }
+    ConfigWriteSection("Folders", "FolderMenu", content)
+}
+
+ConfigReadPromptData() {
+    promptData := Map()
+    loop 10 {
+        num := A_Index - 1
+        promptData[num] := []
+        content := ConfigReadSection("Prompts", "Numpad" . num, "")
+
+        if (content != "") {
+            loop parse, content, "`n", "`r" {
+                pair := ParseIniKeyValuePairs(A_LoopField)
+                if (pair.Key != "") {
+                    promptData[num].Push({ Title: pair.Key, Msg: StrReplace(pair.Val, "\n", "`n") })
+                }
+            }
+        }
+    }
+    return promptData
+}
+
+ConfigReadPromptItems(groupNum) {
+    items := []
+    content := ConfigReadSection("Prompts", "Numpad" . groupNum, "")
+
+    if (content != "") {
+        loop parse, content, "`n", "`r" {
+            pair := ParseIniKeyValuePairs(A_LoopField)
+            if (pair.Key != "") {
+                items.Push({
+                    fontSize: 11,
+                    fontColor: "black",
+                    label: pair.Key,
+                    msg: StrReplace(pair.Val, "\n", "`n")
+                })
+            }
+        }
+    }
+
+    return items
+}
+
+ConfigWritePromptData(promptData) {
+    loop 10 {
+        num := A_Index - 1
+        content := ""
+        if (promptData[num].Length > 0) {
+            for item in promptData[num] {
+                content .= item.Title . "=" . StrReplace(item.Msg, "`n", "\n") . "`n"
+            }
+        }
+        ConfigWriteSection("Prompts", "Numpad" . num, content)
+    }
+}
+
+ConfigReadHotstringData() {
+    schemaVer := ConfigReadValue("Hotstrings", "Meta", "SchemaVersion", "1")
+    if (schemaVer == "4")
+        return ConfigReadHotstringDataV4()
+    return ConfigReadHotstringDataLegacy()
+}
+
+ConfigReadHotstringDataV4() {
+    localData := Map()
+    groupOrder := []
+    groupCount := ConfigReadIntegerValue("Hotstrings", "Groups", "Count", 0)
+
+    loop groupCount {
+        groupNo := Format("{:03}", A_Index)
+        groupId := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Id", "Group" . groupNo)
+        groupType := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Type", "Space")
+        groupName := ConfigReadValue("Hotstrings", "Groups", "Group" . groupNo . "Name", "Default")
+        groupSection := HotstringMakeRuntimeSection(groupType, HotstringDecodeIniValue(groupName))
+
+        if (localData.Has(groupSection))
+            groupSection := HotstringMakeRuntimeSection(groupType, HotstringDecodeIniValue(groupName) . "_" . groupId)
+
+        localData[groupSection] := []
+        groupOrder.Push(groupSection)
+
+        itemCount := ConfigReadIntegerValue("Hotstrings", groupId, "ItemCount", 0)
+        loop itemCount {
+            itemNo := Format("{:03}", A_Index)
+            triggerText := HotstringDecodeIniValue(ConfigReadValue("Hotstrings", groupId, "Item" . itemNo . "Key", ""))
+            replacementText := HotstringDecodeIniValue(ConfigReadValue("Hotstrings", groupId, "Item" . itemNo . "Val", ""))
+            if (triggerText != "" && replacementText != "") {
+                localData[groupSection].Push({ Key: triggerText, Val: replacementText })
+            }
+        }
+    }
+
+    if (localData.Count == 0) {
+        localData["Group_Space_Default"] := []
+        groupOrder.Push("Group_Space_Default")
+    }
+
+    return { Data: localData, GroupOrder: groupOrder }
+}
+
+ConfigReadHotstringDataLegacy() {
+    localData := Map()
+    groupOrder := []
+    discoveredOrder := []
+    legacySectionMap := Map()
+    sections := ConfigReadSections("Hotstrings")
+
+    if (sections != "") {
+        loop parse, sections, "`n", "`r" {
+            legacySectionName := Trim(A_LoopField)
+            if (legacySectionName == "" || legacySectionName == "Meta" || legacySectionName == "GroupOrder")
+                continue
+
+            runtimeSection := HotstringMapLegacySection(legacySectionName)
+            if (runtimeSection == "")
+                continue
+
+            legacySectionMap[legacySectionName] := runtimeSection
+            if (!localData.Has(runtimeSection)) {
+                localData[runtimeSection] := []
+                discoveredOrder.Push(runtimeSection)
+            }
+
+            content := ConfigReadSection("Hotstrings", legacySectionName, "")
+            if (content != "") {
+                loop parse, content, "`n", "`r" {
+                    pair := ParseIniKeyValuePairs(A_LoopField)
+                    if (pair.Key != "" && pair.Val != "") {
+                        fixed := FixIniSpecialChars(pair.Key, pair.Val)
+                        localData[runtimeSection].Push({ Key: fixed.Key, Val: StrReplace(fixed.Val, "\n", "`n") })
+                    }
+                }
+            }
+        }
+    }
+
+    savedOrder := ConfigReadValue("Hotstrings", "GroupOrder", "Order", "")
+    if (savedOrder != "") {
+        loop parse, savedOrder, "," {
+            oldSecName := Trim(A_LoopField)
+            if (oldSecName == "")
+                continue
+            groupSection := legacySectionMap.Has(oldSecName) ? legacySectionMap[oldSecName] : HotstringMapLegacySection(oldSecName)
+            if (groupSection != "" && localData.Has(groupSection) && !ConfigArrayHasValue(groupOrder, groupSection))
+                groupOrder.Push(groupSection)
+        }
+    }
+
+    for groupSection in discoveredOrder {
+        if !ConfigArrayHasValue(groupOrder, groupSection)
+            groupOrder.Push(groupSection)
+    }
+
+    if (localData.Count == 0) {
+        localData["Group_Space_Default"] := []
+        groupOrder.Push("Group_Space_Default")
+    }
+
+    return { Data: localData, GroupOrder: groupOrder }
+}
+
+ConfigWriteHotstringData(localData, groupOrder) {
+    configPath := GetConfigPath("Hotstrings")
+    fullRollbackPath := ConfigCreateRollbackCopy(configPath)
+
+    try {
+        sections := ConfigReadSections("Hotstrings")
+        if (sections != "") {
+            loop parse, sections, "`n", "`r" {
+                sectionName := Trim(A_LoopField)
+                if (sectionName != "" && sectionName != "Meta")
+                    ConfigDeleteSection("Hotstrings", sectionName)
+            }
+        }
+
+        ConfigWriteValue("Hotstrings", "Meta", "SchemaVersion", "4")
+
+        groupDefs := []
+        for groupSection in groupOrder {
+            if !localData.Has(groupSection)
+                continue
+
+            groupType := HotstringGetRuntimeGroupType(groupSection)
+            groupName := HotstringGetRuntimeGroupName(groupSection)
+            if (groupName == "")
+                groupName := "Default"
+
+            itemCount := 0
+            itemContent := ""
+            for item in localData[groupSection] {
+                triggerText := Trim(item.Key)
+                replacementText := Trim(item.Val)
+                if (triggerText == "" || replacementText == "")
+                    continue
+                itemCount++
+                itemNo := Format("{:03}", itemCount)
+                itemContent .= "Item" . itemNo . "Key=" . HotstringEncodeIniValue(triggerText) . "`n"
+                itemContent .= "Item" . itemNo . "Val=" . HotstringEncodeIniValue(replacementText) . "`n"
+            }
+            groupDefs.Push({ Type: groupType, Name: groupName, ItemContent: "ItemCount=" . itemCount . "`n" . itemContent })
+        }
+
+        if (groupDefs.Length == 0)
+            groupDefs.Push({ Type: "Space", Name: "Default", ItemContent: "ItemCount=0`n" })
+
+        groupsContent := "Count=" . groupDefs.Length . "`n"
+        for idx, groupDef in groupDefs {
+            groupNo := Format("{:03}", idx)
+            groupId := "Group" . groupNo
+            groupsContent .= "Group" . groupNo . "Id=" . groupId . "`n"
+            groupsContent .= "Group" . groupNo . "Type=" . groupDef.Type . "`n"
+            groupsContent .= "Group" . groupNo . "Name=" . HotstringEncodeIniValue(groupDef.Name) . "`n"
+            ConfigWriteSection("Hotstrings", groupId, groupDef.ItemContent)
+        }
+        ConfigWriteSection("Hotstrings", "Groups", groupsContent)
+    } catch Error as err {
+        ConfigRestoreRollbackCopy(configPath, fullRollbackPath)
+        throw err
+    } finally {
+        ConfigDeleteFileQuietly(fullRollbackPath)
+    }
+}
+
+ConfigReadIntegerValue(configName, section, key, defaultValue := 0) {
+    val := ConfigReadValue(configName, section, key, defaultValue)
+    try {
+        return Integer(val)
+    } catch {
+        return defaultValue
+    }
+}
+
+HotstringMapLegacySection(sectionName) {
+    if (SubStr(sectionName, 1, 12) == "Group_Space_")
+        return sectionName
+    if (SubStr(sectionName, 1, 11) == "Group_Menu_")
+        return sectionName
+    if (SubStr(sectionName, 1, 11) == "Group_Auto_")
+        return "Group_Space_" . SubStr(sectionName, 12)
+    if (SubStr(sectionName, 1, 6) == "Group_")
+        return "Group_Space_" . SubStr(sectionName, 7)
+    if (sectionName == "AutoReplace" || sectionName == "SpaceReplace")
+        return "Group_Space_Default"
+    return ""
+}
+
+HotstringMakeRuntimeSection(groupType, groupName) {
+    normalizedType := (StrLower(Trim(groupType)) == "menu") ? "Menu" : "Space"
+    normalizedName := Trim(groupName)
+    if (normalizedName == "")
+        normalizedName := "Default"
+    return "Group_" . normalizedType . "_" . normalizedName
+}
+
+HotstringGetRuntimeGroupType(groupSection) {
+    if (SubStr(groupSection, 1, 11) == "Group_Menu_")
+        return "Menu"
+    return "Space"
+}
+
+HotstringGetRuntimeGroupName(groupSection) {
+    if (SubStr(groupSection, 1, 12) == "Group_Space_")
+        return SubStr(groupSection, 13)
+    if (SubStr(groupSection, 1, 11) == "Group_Menu_")
+        return SubStr(groupSection, 12)
+    return groupSection
+}
+
+HotstringEncodeIniValue(value) {
+    value := StrReplace(value, "%", "%25")
+    value := StrReplace(value, "`r", "%0D")
+    value := StrReplace(value, "`n", "%0A")
+    return value
+}
+
+HotstringDecodeIniValue(value) {
+    value := StrReplace(value, "%0D", "`r")
+    value := StrReplace(value, "%0A", "`n")
+    value := StrReplace(value, "%25", "%")
+    return value
+}
+
+ConfigCountHotstrings() {
+    counts := { Space: 0, Menu: 0, Total: 0 }
+    hotstringData := ConfigReadHotstringData()
+    for groupSection in hotstringData.GroupOrder {
+        if !hotstringData.Data.Has(groupSection)
+            continue
+        itemCount := hotstringData.Data[groupSection].Length
+        if (HotstringGetRuntimeGroupType(groupSection) == "Menu")
+            counts.Menu += itemCount
+        else
+            counts.Space += itemCount
+        counts.Total += itemCount
+    }
+    return counts
+}
+
+ConfigReadKeyRemaps() {
+    remaps := []
+    content := ConfigReadSection("KeyRemaps", "Remaps", "")
+
+    if (content != "") {
+        loop parse, content, "`n", "`r" {
+            pair := ParseIniKeyValuePairs(A_LoopField)
+            if (pair.Key != "")
+                remaps.Push({ Src: pair.Key, Dst: pair.Val })
+        }
+    }
+
+    return remaps
+}
+
+ConfigWriteKeyRemaps(remaps) {
+    content := ""
+    for item in remaps {
+        content .= item.Src . "=" . item.Dst . "`n"
+    }
+    ConfigWriteSection("KeyRemaps", "Remaps", content)
+}
+
+ConfigCountPairs(configName, section) {
+    count := 0
+    content := ConfigReadSection(configName, section, "")
+    loop parse, content, "`n", "`r" {
+        if (ParseIniKeyValuePairs(A_LoopField).Key != "")
+            count++
+    }
+    return count
+}
+
+ConfigArrayHasValue(arr, val) {
+    for item in arr {
+        if (item == val)
+            return true
+    }
+    return false
+}
+
+; =============================================================================
+; SECTION: Default Config Data Templates
+; =============================================================================
+GetDefaultFolderData() {
+    return "[Settings]`n"
+    . "MainHotkey=F1`n"
+    . "PromptModifier=#`n"
+    . "PromptUseNumpad=1`n`n"
+    . "[FolderMenu]`n"
+    . "💾 C-Drive=C:\`n"
+    . "-=-`n"
+    . "📥 Downloads=" . EnvGet("USERPROFILE") . "\Downloads`n"
+        . "🖥️ Desktop=" . A_Desktop . "`n"
+        . "📄 Documents=" . A_MyDocuments . "`n"
+        . "-=-`n"
+        . "🚀 Startup=" . A_Startup . "`n"
+        . "⚙️ AppData (Roaming)=" . A_AppData . "`n"
+}
+
+GetDefaultHotkeyData() {
+    return "[Numpad1]`n"
+    . "1 Outlook Active Email Analyzer=Please analyze this email thread and provide a highly condensed, dense summary in Korean. 1. If I am in CC (Cc/참조), outline the full context, background discussion, and core consensus of the entire thread so I don't miss the big picture. 2. For Tax/Legal/Compliance issues, detail the precise root cause, legal grounds/clauses, and technical terms. 3. For IT System/Finance/Sales improvements, clearly list: Who, What, Why, and the Risks if ignored. Output Style: Keep it extremely compact and space-efficient. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines between sections, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "2 Outlook Draft Business Reply=Write a polite and professional reply email in Korean and in English based on the following key points: [insert]. Ensure a formal business tone suitable for corporate communications. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "3 Outlook Terminology & Abbreviation Decoder=Analyze the email and explain any industry-specific jargon, technical terms, or abbreviations in Korean with simple, clear definitions. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "4 Outlook Recipient & Org Analyzer=Please analyze the recipients (To, Cc) of this email thread and identify the [organizations] in Korean. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n`n"
+    . "[Numpad2]`n"
+    . "1 Edge Active Page Analyzer=Please analyze the active document/page and provide a concise summary in Korean. First, identify the document type and characteristics (e.g., action-oriented task, informational report, legal/regulatory clause). Then, dynamically highlight approximately three key takeaways tailored to its type: if it requires action, outline the specific next steps; if it is for information, summarize the core concepts to understand; if it carries legal or compliance requirements, point out the essential obligations. Adapt the focus flexibly based on the document's nature. Output Style: Keep it extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines between sections, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "2 Edge Terminology & Abbreviation Decoder=Analyze the active document and explain any industry-specific jargon, technical terms, or abbreviations in Korean with simple, clear definitions. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "3 Edge Contract & Risk Analysis=Please analyze this document or contract and provide a highly condensed review in Korean. First, identify the document type and characteristics. 1) B2B Commercial Transactions: Highlight payment terms, liability limits, termination, acceptance terms, and penalties. 2) Service Agreements (SLA): Focus on SOW, SLA targets, IP ownership, confidentiality, and performance penalties. 3) Tax/Transfer Pricing (TP/CIP/VAT): Focus on tax compliance risks, transfer pricing alignments, customs/declarations, and liabilities. 4) HR/Labor/General Legal: Focus on employment terms, non-competes, compliance with labor standards, and dispute resolution. Dynamically list critical risks (if any). Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n`n"
+    . "[Numpad3]`n"
+    . "1 AI C-Level Business Drafter=Act as a Top-Tier Management Consultant and Senior Executive Assistant. Draft a highly professional, persuasive, and diplomatically polite business email/proposal based on the following context: [목적 및 핵심 전달 사항 입력]. Structure it logically with a clear introduction, bulleted main points for readability, and a strong call-to-action (CTA). Ensure the tone is C-level appropriate, avoiding fluff. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "2 AI Report Synthesizer=Act as a Senior Business Analyst. Analyze the following raw data, meeting transcript, or complex report text: [방대한 데이터 또는 난해한 텍스트 입력]. Extract the signal from the noise and synthesize it into a structured Executive Summary. Provide: 1. Core Issue/Objective. 2. 3 Key Takeaways (Data-backed if possible). 3. Immediate Action Items (Who needs to do what). Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "3 AI Strategy CSO Reviewer=Act as a sharp, experienced Chief Strategy Officer (CSO). Review the following draft proposal/idea: [기획안/아이디어 초안 입력]. I want ruthless but constructive feedback. 1. Identify logical gaps, weak arguments, or unaddressed risks. 2. Suggest specific, actionable improvements to make it bulletproof. 3. Provide an optimized, polished version of the core pitch. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks.`n"
+    . "4 AI Corporate Translator=Act as an Expert Corporate Bilingual Translator. Translate the following text into [Target Language, default: Korean]: [번역할 텍스트 입력]. Do not translate literally word-for-word. Instead, capture the underlying business nuance, industry standard terminology, and professional tone. Elevate informal source text to a formal corporate standard. Provide only the translated result without conversational filler. Output Style: Extremely compact. Use only single newlines (\n) for line breaks. Never use double newlines (\n\n) or blank lines, so that when copied, the entire output pastes as a single, cohesive, tightly spaced text block while preserving the exact line breaks."
+}
+
+GetDefaultHotstringData() {
+    return "[Meta]`n"
+    . "SchemaVersion=4`n`n"
+    . "[Groups]`n"
+    . "Count=5`n"
+    . "Group001Id=Group001`n"
+    . "Group001Type=Space`n"
+    . "Group001Name=Bullets_Indicators`n"
+    . "Group002Id=Group002`n"
+    . "Group002Type=Space`n"
+    . "Group002Name=Math`n"
+    . "Group003Id=Group003`n"
+    . "Group003Type=Space`n"
+    . "Group003Name=Arrows`n"
+    . "Group004Id=Group004`n"
+    . "Group004Type=Space`n"
+    . "Group004Name=Currency`n"
+    . "Group005Id=Group005`n"
+    . "Group005Type=Space`n"
+    . "Group005Name=For_Email`n`n"
+    . "[Group001]`n"
+    . "ItemCount=8`n"
+    . "Item001Key=z.z`n"
+    . "Item001Val=▣`n"
+    . "Item002Key=x.x`n"
+    . "Item002Val=※`n"
+    . "Item003Key=c.c`n"
+    . "Item003Val=⊙`n"
+    . "Item004Key=***.`n"
+    . "Item004Val=★`n"
+    . "Item005Key=**.`n"
+    . "Item005Val=☆`n"
+    . "Item006Key=v.v`n"
+    . "Item006Val=✓`n"
+    . "Item007Key=q.q`n"
+    . "Item007Val=☑`n"
+    . "Item008Key=r.r`n"
+    . "Item008Val=☞`n`n"
+    . "[Group002]`n"
+    . "ItemCount=5`n"
+    . "Item001Key=d.d`n"
+    . "Item001Val=Δ`n"
+    . "Item002Key=+-`n"
+    . "Item002Val=±`n"
+    . "Item003Key=!=`n"
+    . "Item003Val=≠`n"
+    . "Item004Key=>=`n"
+    . "Item004Val=≥`n"
+    . "Item005Key=<=`n"
+    . "Item005Val=≤`n`n"
+    . "[Group003]`n"
+    . "ItemCount=7`n"
+    . "Item001Key=>>`n"
+    . "Item001Val=→`n"
+    . "Item002Key=<<`n"
+    . "Item002Val=←`n"
+    . "Item003Key=0++`n"
+    . "Item003Val=↑`n"
+    . "Item004Key=0--`n"
+    . "Item004Val=↓`n"
+    . "Item005Key=<->`n"
+    . "Item005Val=↔`n"
+    . "Item006Key=t.t`n"
+    . "Item006Val=▶`n"
+    . "Item007Key=y.y`n"
+    . "Item007Val=▷`n`n"
+    . "[Group004]`n"
+    . "ItemCount=12`n"
+    . "Item001Key=_usd`n"
+    . "Item001Val=$`n"
+    . "Item002Key=_eur`n"
+    . "Item002Val=€`n"
+    . "Item003Key=_gbp`n"
+    . "Item003Val=£`n"
+    . "Item004Key=_chf`n"
+    . "Item004Val=₣`n"
+    . "Item005Key=_pln`n"
+    . "Item005Val=zł`n"
+    . "Item006Key=_czk`n"
+    . "Item006Val=Kč`n"
+    . "Item007Key=_huf`n"
+    . "Item007Val=Ft`n"
+    . "Item008Key=_ron`n"
+    . "Item008Val=lei`n"
+    . "Item009Key=_bgn`n"
+    . "Item009Val=лв`n"
+    . "Item010Key=_try`n"
+    . "Item010Val=₺`n"
+    . "Item011Key=_rub`n"
+    . "Item011Val=₽`n"
+    . "Item012Key=_krw`n"
+    . "Item012Val=₩`n`n"
+    . "[Group005]`n"
+    . "ItemCount=5`n"
+    . "Item001Key=_br`n"
+    . "Item001Val=Best regards,`n"
+    . "Item002Key=_tr`n"
+    . "Item002Val=Thanks and regards,`n"
+    . "Item003Key=_fyi`n"
+    . "Item003Val=For your information,`n"
+    . "Item004Key=_fya`n"
+    . "Item004Val=For your action,`n"
+    . "Item005Key=_asap`n"
+    . "Item005Val=as soon as possible"
+}
+
+GetDefaultKeyRemapData() {
+    return "[Remaps]`n"
+    . "; Format: SourceKey=DestinationKey`n"
+    . "; Example: CapsLock=LButton`n"
+    . "; Example: ScrollLock=Tab"
+}
