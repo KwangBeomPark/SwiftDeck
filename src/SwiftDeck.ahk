@@ -3,7 +3,7 @@
 ;@Ahk2Exe-SetName SwiftDeck
 ;@Ahk2Exe-SetVersion 8.1.1.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
-;@Ahk2Exe-SetMainIcon SwiftDeck.ico
+;@Ahk2Exe-SetMainIcon ..\assets\SwiftDeck.ico
 
 ; =============================================================================
 ; SECTION: Global Configuration
@@ -34,32 +34,48 @@ global g_filePath_KeyRemap := g_targetFolder . g_fileName_KeyRemap
 global g_registeredHotstrings := []
 global g_registeredKeyRemaps := Map()
 
+GetAppAssetPath(fileName) {
+    candidates := [
+        A_ScriptDir . "\assets\" . fileName,
+        A_ScriptDir . "\..\assets\" . fileName,
+        A_ScriptDir . "\" . fileName
+    ]
+
+    for candidate in candidates {
+        if FileExist(candidate)
+            return candidate
+    }
+    return A_ScriptDir . "\assets\" . fileName
+}
+
 ; =============================================================================
 ; SECTION: Tray Icon
 ; =============================================================================
-if FileExist(A_ScriptDir . "\SwiftDeck.ico") {
-    TraySetIcon(A_ScriptDir . "\SwiftDeck.ico")
+appIconPath := GetAppAssetPath("SwiftDeck.ico")
+if FileExist(appIconPath) {
+    TraySetIcon(appIconPath)
 }
 
 ; =============================================================================
 ; SECTION: Script Configuration (Includes & Global Variables)
 ; =============================================================================
 
-#Include %A_ScriptDir%/lib/Theme.ahk
-#Include %A_ScriptDir%/lib/Utils.ahk
-#Include %A_ScriptDir%/lib/Clipboard.ahk
-#Include %A_ScriptDir%/lib/Config.ahk
-#Include %A_ScriptDir%/lib/Migration.ahk
-#Include %A_ScriptDir%/lib/FolderMenu.ahk
-#Include %A_ScriptDir%/lib/FolderManager.ahk
-#Include %A_ScriptDir%/lib/PreferencesManager.ahk
-#Include %A_ScriptDir%/lib/PromptManager.ahk
-#Include %A_ScriptDir%/lib/HotstringManager.ahk
-#Include %A_ScriptDir%/lib/KeyRemapManager.ahk
-#Include %A_ScriptDir%/lib/EmojiPicker.ahk
-#Include %A_ScriptDir%/lib/DashboardManager.ahk
-#Include %A_ScriptDir%/lib/AppInfo.ahk
-#Include %A_ScriptDir%/lib/Manual.ahk
+#Include lib\Theme.ahk
+#Include lib\Utils.ahk
+#Include lib\Clipboard.ahk
+#Include lib\Config.ahk
+#Include lib\Migration.ahk
+#Include lib\FolderMenu.ahk
+#Include lib\FolderManager.ahk
+#Include lib\PreferencesManager.ahk
+#Include lib\PromptManager.ahk
+#Include lib\PromptMenu.ahk
+#Include lib\HotstringManager.ahk
+#Include lib\KeyRemapManager.ahk
+#Include lib\EmojiPicker.ahk
+#Include lib\DashboardManager.ahk
+#Include lib\AppInfo.ahk
+#Include lib\Manual.ahk
 
 ; =============================================================================
 ; SECTION: Application Startup
@@ -108,17 +124,20 @@ OnStartup() {
         }
     }
 
-    ; Register Emoji Picker and Exit hotkeys
+    ; Register Emoji Picker, Prompt Menu, and Exit hotkeys
     try Hotkey(settings.EmojiHotkey, (*) => g_emojiMenu.Show())
+    try Hotkey("+#Space", (*) => ShowPromptMenu())  ; Shift+Win+Space → Prompt Popup Menu
     try Hotkey(settings.ExitHotkey, (*) => ExitApp())
 
     ; Register dynamic "Add Current Explorer Folder" hotkey (Ctrl + mainHotkey)
     addFolderHotkey := "^" . settings.MainHotkey
+    HotIf((*) => GetActiveExplorerPath() != "")
     try {
         Hotkey(addFolderHotkey, (*) => AddCurrentExplorerFolder())
     } catch {
         Hotkey("^F1", (*) => AddCurrentExplorerFolder())
     }
+    HotIf() ; Reset context to default (global)
 
     ; Setup custom tray menu
     SetupTrayMenu(settings.MainHotkey)
