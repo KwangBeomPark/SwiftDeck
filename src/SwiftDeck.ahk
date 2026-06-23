@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName SwiftDeck
-;@Ahk2Exe-SetVersion 8.1.1.0
+;@Ahk2Exe-SetVersion 1.1.1.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
 ;@Ahk2Exe-SetMainIcon ..\assets\SwiftDeck.ico
 
@@ -10,7 +10,7 @@
 ; =============================================================================
 
 ; [Global] Display version shown in the app UI
-global g_appVersion := "8.1.1"
+global g_appVersion := "1.1.1"
 
 ; [Global] Path configuration (migrate legacy folder name)
 if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
