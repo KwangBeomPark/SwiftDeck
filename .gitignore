@@ -14,3 +14,8 @@ test_json_out.txt
 *.lnk
 App02_*DoNotDelete.ini
 App02_*DoNotDelete.ini.bak
+
+# Local AI working notes
+AGENTS.md
+AI_CODE_MAP.md
+myAGENT.md
