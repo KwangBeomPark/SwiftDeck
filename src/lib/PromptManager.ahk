@@ -34,15 +34,20 @@ class PromptManager {
         PromptManager.dataGroup.Push({
             fontSize: 11,
             fontColor: "black",
-            label: "0. Nothing",
+            label: "Nothing",
             msg: ""
         })
+
+        hkDisplay := FormatHotkeyDisplay(A_ThisHotkey)
+        total := PromptManager.dataGroup.Length
 
         while PromptHotkeyModifierPressed(A_ThisHotkey) {
             if GetKeyState(tapKey, "P") {
                 PromptManager.selectedIndex := (PromptManager.selectedIndex < PromptManager.dataGroup.Length) ? PromptManager.selectedIndex + 1 :
                     1
-                ToolTip(PromptManager.dataGroup[PromptManager.selectedIndex].label)
+                sel := PromptManager.selectedIndex
+                ; Show the hotkey and position (e.g. "Win+Numpad1 (2/5)") above the title.
+                ToolTip(hkDisplay . " (" . sel . "/" . total . ")`n" . PromptManager.dataGroup[sel].label)
                 Sleep(200)
             } else {
                 Sleep(10)

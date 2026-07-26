@@ -90,6 +90,16 @@ class PreferencesManager {
         this.ddlPromptNumpad := guiObj.Add("DropDownList", "x" . (startX + 240) . " y" . (startY + 145) . " w155 Choose" . numpadChoose, ["Numpad 0~9", "Standard 0~9"])
         guiObj.SetFont("c" . THEME_TEXT)
 
+        ; --- Live hotkey preview (updates as modifiers / number type change) ---
+        guiObj.SetFont("s9 c" . THEME_ACCENT, "Segoe UI")
+        this.txtPromptPreview := guiObj.Add("Text", "x" . (startX + 15) . " y" . (startY + 192) . " w380", "")
+        guiObj.SetFont("s10 c" . THEME_TEXT, "Segoe UI")
+
+        for ctrl in [this.chkPromptCtrl, this.chkPromptShift, this.chkPromptWin, this.chkPromptAlt]
+            ctrl.OnEvent("Click", ObjBindMethod(this, "UpdatePromptPreview"))
+        this.ddlPromptNumpad.OnEvent("Change", ObjBindMethod(this, "UpdatePromptPreview"))
+        this.UpdatePromptPreview()
+
         ; --- Save Preferences ---
         guiObj.SetFont("s10 cWhite bold", "Segoe UI")
         btnSave := guiObj.Add("Text", "x" . startX . " y" . (startY + 230) . " w410 h40 Center +0x200 +Border Background4A4F54", "💾 Save & Apply")
@@ -105,6 +115,17 @@ class PreferencesManager {
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
     }
 
+    ; Refreshes the "Preview: Win+Num1 … Win+Num9" hint from the current selections.
+    UpdatePromptPreview(*) {
+        modStr := BuildKeyString(this.chkPromptCtrl.Value, this.chkPromptShift.Value, this.chkPromptWin.Value, this.chkPromptAlt.Value, "")
+        if (modStr == "") {
+            this.txtPromptPreview.Value := "⚠️ Select at least one modifier"
+            return
+        }
+        prefix := FormatHotkeyDisplay(modStr)
+        numLabel := (this.ddlPromptNumpad.Value == 1) ? "Num" : ""
+        this.txtPromptPreview.Value := "Preview:  " . prefix . numLabel . "1  …  " . prefix . numLabel . "9"
+    }
 
     SavePreferences(*) {
         mainBase := Trim(this.cbMainKey.Text)

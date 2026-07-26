@@ -30,33 +30,60 @@ BuildPromptMenu() {
     if !ConfigExists("Prompts")
         return
 
-    promptData := ConfigReadPromptData()
-    hasAnyItems := false
+    ; Read the user's configured prompt hotkey so each group shows its actual
+    ; shortcut (e.g. "Win+Num1") instead of a generic "Slot 1".
+    settings := ConfigReadAppSettings()
+    modDisplay := FormatHotkeyDisplay(settings.PromptModifier)
 
-    loop 10 {
-        num := A_Index - 1
-        if !promptData.Has(num)
-            continue
-        if (promptData[num].Length == 0)
-            continue
-
-        ; Create a submenu for each numpad group
-        subMenu := Menu()
-        for idx, item in promptData[num] {
-            itemLabel := SafePromptLabel(item.Title, "Prompt")
-            boundNum := num
-            boundIdx := idx
-            subMenu.Add(itemLabel, ((n, i, *) => _ExecutePromptFromMenu(n, i)).Bind(boundNum, boundIdx))
-        }
-
-        groupLabel := "⌨️ Slot " . num
-        g_promptMenu.Add(groupLabel, subMenu)
-        hasAnyItems := true
+    ; Build the group label from the real hotkey. Falls back to "Slot N" when
+    ; the prompt modifier is empty (hotkeys disabled), since no shortcut applies.
+    PromptGroupLabel(num) {
+        if (settings.PromptModifier == "")
+            return "⌨️ Slot " . num
+        keyPart := (settings.PromptUseNumpad ? "Num" : "") . num
+        return "⌨️ " . modDisplay . keyPart
     }
 
+    promptData := ConfigReadPromptData()
+
+    ; First pass: is any slot populated at all?
+    hasAnyItems := false
+    loop 10 {
+        n := A_Index - 1
+        if (promptData.Has(n) && promptData[n].Length > 0) {
+            hasAnyItems := true
+            break
+        }
+    }
+
+    ; Nothing configured anywhere — show a single hint and stop.
     if (!hasAnyItems) {
         g_promptMenu.Add("(No prompts registered)", (*) => 0)
         g_promptMenu.Disable("(No prompts registered)")
+        return
+    }
+
+    ; Second pass: one entry per slot. Populated slots get a submenu; empty slots
+    ; are shown disabled so the full hotkey map stays discoverable at a glance.
+    loop 10 {
+        num := A_Index - 1
+        groupLabel := PromptGroupLabel(num)
+
+        if (promptData.Has(num) && promptData[num].Length > 0) {
+            subMenu := Menu()
+            for idx, item in promptData[num] {
+                ; Prefix the tap-order number so the menu matches the tap-to-cycle sequence.
+                itemLabel := idx . ". " . SafePromptLabel(item.Title, "Prompt")
+                boundNum := num
+                boundIdx := idx
+                subMenu.Add(itemLabel, ((n, i, *) => _ExecutePromptFromMenu(n, i)).Bind(boundNum, boundIdx))
+            }
+            g_promptMenu.Add(groupLabel, subMenu)
+        } else if (settings.PromptModifier != "") {
+            emptyLabel := groupLabel . "  —  (empty)"
+            g_promptMenu.Add(emptyLabel, (*) => 0)
+            g_promptMenu.Disable(emptyLabel)
+        }
     }
 }
 

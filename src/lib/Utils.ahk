@@ -109,8 +109,10 @@ BuildKeyString(ctrl, shift, win, alt, baseKey) {
 
 FormatHotkeyDisplay(hotkeyLabel) {
     formattedHK := hotkeyLabel
-    formattedHK := StrReplace(formattedHK, "^", "Ctrl+")
+    ; Replace "+" (Shift) first so the "+" introduced by later replacements
+    ; (e.g. "Ctrl+") is not mistaken for a Shift modifier.
     formattedHK := StrReplace(formattedHK, "+", "Shift+")
+    formattedHK := StrReplace(formattedHK, "^", "Ctrl+")
     formattedHK := StrReplace(formattedHK, "#", "Win+")
     formattedHK := StrReplace(formattedHK, "!", "Alt+")
     return formattedHK

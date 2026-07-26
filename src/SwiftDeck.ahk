@@ -140,11 +140,11 @@ OnStartup() {
     HotIf() ; Reset context to default (global)
 
     ; Setup custom tray menu
-    SetupTrayMenu(settings.MainHotkey)
+    SetupTrayMenu(settings)
 
-    ; Show welcome screen (manual) on first run
+    ; Show a concise hotkey cheat sheet on first run (manual stays available in the tray)
     if (isFirstRun) {
-        SetTimer(() => OpenAppManual("EN"), -1000) ; Show manual after 1 second
+        SetTimer(() => ShowHotkeyCheatSheet(), -1000) ; Show cheat sheet after 1 second
     }
 
     ; Show startup notification (TrayTip)
@@ -159,21 +159,57 @@ BindPrompt(num) {
     return (*) => PromptManager.ProcessQuickPrompt(num)
 }
 
-SetupTrayMenu(hotkeyLabel := "F1") {
+SetupTrayMenu(settings) {
+    global g_emojiMenu
     A_TrayMenu.Delete() ; Remove default AHK tray items (Open, Pause, Exit, etc.)
 
-    formattedHK := FormatHotkeyDisplay(hotkeyLabel)
+    ; Format hotkey hints so every actionable item advertises its shortcut
+    mainHK := FormatHotkeyDisplay(settings.MainHotkey)
+    emojiHK := FormatHotkeyDisplay(settings.EmojiHotkey)
+    promptMenuHK := FormatHotkeyDisplay("+#Space") ; Shift+Win+Space (registered in OnStartup)
+    exitHK := FormatHotkeyDisplay(settings.ExitHotkey)
 
-    A_TrayMenu.Add("📂 Open Folders Menu (" . formattedHK . ")", (*) => ShowFavoritesMenu())
+    foldersLabel := "📂 Open Folders Menu (" . mainHK . ")"
+    A_TrayMenu.Add(foldersLabel, (*) => ShowFavoritesMenu())
+    A_TrayMenu.Add("⌨️ Quick Prompts Menu (" . promptMenuHK . ")", (*) => ShowPromptMenu())
+    A_TrayMenu.Add("😀 Emoji && Symbols (" . emojiHK . ")", (*) => g_emojiMenu.Show())
     A_TrayMenu.Add()
     A_TrayMenu.Add("⚙️ App Settings", (*) => DashboardManager.Show(1))
     A_TrayMenu.Add("📁 Open Settings Folder", (*) => RunSafely("explorer.exe `"" . ConfigGetSettingsFolder() . "`"", "Open Settings Folder"))
     A_TrayMenu.Add("📘 Open App Manual", (*) => OpenAppManual("EN"))
+    A_TrayMenu.Add("⌨️ Hotkey Cheat Sheet", (*) => ShowHotkeyCheatSheet())
     A_TrayMenu.Add("ℹ️ App Information", (*) => ShowAppInformation())
     A_TrayMenu.Add()
     A_TrayMenu.Add("🔄 Reload App", (*) => Reload())
-    A_TrayMenu.Add("❌ Exit App", (*) => ExitApp())
+    A_TrayMenu.Add("❌ Exit App (" . exitHK . ")", (*) => ExitApp())
 
     ; Double-click tray icon to open favorites menu
-    A_TrayMenu.Default := "📂 Open Folders Menu (" . formattedHK . ")"
+    A_TrayMenu.Default := foldersLabel
+}
+
+; Shows a compact, always-on-top summary of the currently active hotkeys.
+ShowHotkeyCheatSheet() {
+    settings := ConfigReadAppSettings()
+
+    mainHK := FormatHotkeyDisplay(settings.MainHotkey)
+    addHK := FormatHotkeyDisplay("^" . settings.MainHotkey)
+    emojiHK := FormatHotkeyDisplay(settings.EmojiHotkey)
+    promptMenuHK := FormatHotkeyDisplay("+#Space")
+    exitHK := FormatHotkeyDisplay(settings.ExitHotkey)
+
+    if (settings.PromptModifier != "") {
+        promptPrefix := FormatHotkeyDisplay(settings.PromptModifier) . (settings.PromptUseNumpad ? "Num" : "")
+        quickLine := promptPrefix . "0 ~ " . promptPrefix . "9"
+    } else {
+        quickLine := "(disabled)"
+    }
+
+    msg := "📂 Favorites Menu`t: " . mainHK . "`n"
+        . "➕ Add Current Folder`t: " . addHK . "`n"
+        . "⌨️ Quick Prompts`t: " . quickLine . "`n"
+        . "📝 Prompt Popup Menu`t: " . promptMenuHK . "`n"
+        . "😀 Emoji & Symbols`t: " . emojiHK . "`n"
+        . "❌ Exit App`t: " . exitHK
+
+    MsgBox(msg, "⌨️ SwiftDeck — Hotkey Cheat Sheet", 262144) ; 0x40000 = always on top
 }
