@@ -83,7 +83,7 @@ Release binaries should be uploaded to GitHub Releases, not committed to the rep
 ✔ After adding, editing, or deleting items in App Settings, click **Save & Apply** to save and reload the configuration.
 
 <p align="center">
-  <img src="./assets/manual.png" width="1000" alt="SwiftDeck User Manual Screenshot">
+  <img src="./assets/manual1.png" width="1000" alt="SwiftDeck User Manual Screenshot">
 </p>
 
 ---
