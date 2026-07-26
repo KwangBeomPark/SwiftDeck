@@ -35,7 +35,8 @@ $releaseDir = "release"
 if (-not (Test-Path $releaseDir)) {
     New-Item -Path $releaseDir -ItemType Directory | Out-Null
 } else {
-    # Clean up legacy App01 files and old SwiftDeck versions to prevent clutter
+    # Clean up legacy App02 files and old SwiftDeck versions to prevent clutter
+    Get-ChildItem $releaseDir -Filter "App02_*" | Remove-Item -Force
     Get-ChildItem $releaseDir -Filter "App01_*" | Remove-Item -Force
     Get-ChildItem $releaseDir -Filter "SwiftDeck.v*" | Remove-Item -Force
 }
@@ -78,21 +79,21 @@ Write-Host "[3/6] Compiling ZIP archive..."
 Compress-Archive -Path $outputExePath -DestinationPath $outputZipPath
 Write-Host "ZIP archive created: $outputZipName"
 
-# 7. Create corporate copy (App01_SwiftDeck_v[Version])
-Write-Host "[4/6] Creating App01_SwiftDeck_v$version copies..."
-$app01ExePath = Join-Path $releaseDir "App01_SwiftDeck_v$version.exe"
-$app01ZipPath = Join-Path $releaseDir "App01_SwiftDeck_v$version.zip"
+# 7. Create corporate copy (App02_SwiftDeck_v[Version])
+Write-Host "[4/6] Creating App02_SwiftDeck_v$version copies..."
+$app02ExePath = Join-Path $releaseDir "App02_SwiftDeck_v$version.exe"
+$app02ZipPath = Join-Path $releaseDir "App02_SwiftDeck_v$version.zip"
 
-Copy-Item -Path $outputExePath -Destination $app01ExePath -Force
-Copy-Item -Path $outputZipPath -Destination $app01ZipPath -Force
-Write-Host "Corporate copy files created (App01_SwiftDeck_v$version.exe and App01_SwiftDeck_v$version.zip)"
+Copy-Item -Path $outputExePath -Destination $app02ExePath -Force
+Copy-Item -Path $outputZipPath -Destination $app02ZipPath -Force
+Write-Host "Corporate copy files created (App02_SwiftDeck_v$version.exe and App02_SwiftDeck_v$version.zip)"
 
 # 8. Git Commit and Push
 Write-Host "[5/6] Committing and pushing git changes..."
 git add .
 $gitStatus = git status --porcelain
 if ($gitStatus) {
-    git commit -m "Release v$version"
+    git commit -m "Update release prefix to App02 for v$version"
     git push origin main
     Write-Host "Git changes successfully pushed to origin."
 } else {
@@ -122,10 +123,11 @@ if ($releaseExists) {
 }
 
 Write-Host "Creating new release $tag and uploading assets..."
-gh release create $tag $outputExePath $outputZipPath $app01ExePath $app01ZipPath --title "SwiftDeck $tag" --notes "Release $tag"
+gh release create $tag $outputExePath $outputZipPath $app02ExePath $app02ZipPath --title "SwiftDeck $tag" --notes "Release $tag"
 
 Write-Host "=========================================="
 Write-Host " Build and Release Pipeline completed successfully!"
 Write-Host "=========================================="
 Write-Host "Deployed files:"
-Get-ChildItem $releaseDir | Where-Object { $_.Name -match "v$version|App01" } | Select-Object Name, Length
+Get-ChildItem $releaseDir | Where-Object { $_.Name -match "v$version|App02" } | Select-Object Name, Length
+
