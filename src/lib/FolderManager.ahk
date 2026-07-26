@@ -220,12 +220,12 @@ class FolderManager {
     }
 
     AddFolder() {
-        ; Temporarily disable AlwaysOnTop of parentGui / main window
+        ; Temporarily disable AlwaysOnTop of parentGui / main window & set dialog ownership
         if (this.parentGui) {
-            this.parentGui.Opt("-AlwaysOnTop")
+            this.parentGui.Opt("-AlwaysOnTop +OwnDialogs")
             WinSetAlwaysOnTop(0, this.mainHwnd)
         } else if (this.rGui) {
-            this.rGui.Opt("-AlwaysOnTop")
+            this.rGui.Opt("-AlwaysOnTop +OwnDialogs")
             WinSetAlwaysOnTop(0, this.rGui.Hwnd)
         }
 
