@@ -1,5 +1,7 @@
 #Requires AutoHotkey v2.0
 #Include Theme.ahk
+#Include Config.ahk
+#Include Utils.ahk
 OpenAppManual(lang := "EN", parentHwnd := 0) {
     mGui := Gui("+AlwaysOnTop +Resize -MaximizeBox", "App Manual")
     if (parentHwnd)
@@ -32,7 +34,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
                 )",
                 part2: "
                 (
-                    - App Settings: 모든 기능을 쉽고 편하게 관리`n**1. 📁 [Folders] 탭, ⌨️ [Prompts] 탭**`n    - 추가(+), 수정(✏️), 지우기(x) 버튼으로 내 입맛대로 리스트를 정리`n**2. ✏️ [Hotstrings] 탭, 🔀 [Key Remap] 탭**`n    - [Hotstrings] 탭에서 나만의 단축어 추가`n    - [Key Remap] 탭에서는 안 쓰는 키를 새롭게 맵핑`n**3. ⚙️ [General] 탭**`n    - 앱 단축키가 마음에 안 든다면? 내가 원하는 버튼으로 자유롭게 변경
+                    - App Settings: 모든 기능을 쉽고 편하게 관리`n**1. 📁 [Folders] 탭, ⌨️ [Prompts] 탭**`n    - 추가(+), 수정(✏️), 지우기(x) 버튼으로 내 입맛대로 리스트를 정리`n**2. ✏️ [Hotstrings] 탭, 🔀 [Key Remap] 탭**`n    - [Hotstrings] 탭에서 나만의 단축어 추가`n    - [Key Remap] 탭에서는 안 쓰는 키를 새롭게 맵핑`n**3. ⚙️ [General] 탭**`n    - 단축키 변경, Windows 자동 시작, 설정 폴더 열기, 백업 및 복원을 한곳에서 관리`n**4. 💾 저장과 복구**`n    - 변경 후 [Save & Apply]를 누름. 저장하지 않고 닫거나 종료하면 저장/버리기/계속 편집을 선택할 수 있음`n    - [Backup Saved]는 마지막으로 저장된 설정을 백업하므로 먼저 저장한 뒤 실행
                 )"
             }
         } else if (langCode == "PL") {
@@ -201,10 +203,31 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
                 )",
                 part2: "
                 (
-                    - App Settings: Manage all your features easily`n**1. 📁 [Folders] Tab, ⌨️ [Prompts] Tab**`n    - Organize your lists exactly as you want with Add (+), ✏️ Edit, and Delete (x) buttons.`n**2. ✏️ [Hotstrings] Tab, 🔀 [Key Remap] Tab**`n    - Add your custom text expansions in the [Hotstrings] tab.`n    - Remap unused keys to new functions in the [Key Remap] tab.`n**3. ⚙️ [General] Tab**`n    - Don't like the app's default hotkeys? Change them to whatever you prefer!
+                    - App Settings: Manage all your features easily`n**1. 📁 [Folders] Tab, ⌨️ [Prompts] Tab**`n    - Organize your lists exactly as you want with Add (+), ✏️ Edit, and Delete (x) buttons.`n**2. ✏️ [Hotstrings] Tab, 🔀 [Key Remap] Tab**`n    - Add your custom text expansions in the [Hotstrings] tab.`n    - Remap unused keys to new functions in the [Key Remap] tab.`n**3. ⚙️ [General] Tab**`n    - Manage hotkeys, Windows startup, the settings folder, backup, and restore in one place.`n**4. 💾 Save and Recovery**`n    - Click [Save & Apply] after edits. Closing or exiting with unsaved changes offers Save All, Discard, or Keep Editing.`n    - [Backup Saved] captures the last saved settings, so save your edits first.
                 )"
             }
         }
+    }
+
+    GetManualShortcutSummary(langCode) {
+        settings := ConfigReadAppSettings()
+        if (settings.PromptModifier == "") {
+            promptRange := "Disabled"
+        } else {
+            promptPrefix := FormatHotkeyDisplay(settings.PromptModifier) . (settings.PromptUseNumpad ? "Num" : "")
+            promptRange := promptPrefix . "0 ~ " . promptPrefix . "9"
+        }
+        heading := langCode == "KR" ? "현재 적용된 단축키" : "Current Shortcuts"
+        return "**" . heading . "**`n"
+            . "    - Favorites: " . FormatHotkeyDisplay(settings.MainHotkey) . " | Add Current Folder: " . FormatHotkeyDisplay(GetAddFolderHotkey(settings.MainHotkey)) . "`n"
+            . "    - Quick Prompts: " . promptRange . " | Popup Menu: " . FormatHotkeyDisplay(GetPromptMenuHotkey()) . "`n"
+            . "    - Emoji & Symbols: " . FormatHotkeyDisplay(settings.EmojiHotkey) . " | Exit: " . FormatHotkeyDisplay(settings.ExitHotkey)
+    }
+
+    BuildManualText(langCode, texts) {
+        return GetManualShortcutSummary(langCode) . "`n`n"
+            . texts.tab1 . "`n" . texts.part1 . "`n`n"
+            . texts.tab2 . "`n" . texts.part2
     }
 
     ; HTML conversion and blue highlight helper
@@ -243,7 +266,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
     ; Create ActiveX HTMLFile control for rich text display
     edtManual := mGui.Add("ActiveX", "x10 y40 w670 h640", "htmlfile")
     doc := edtManual.Value
-    doc.write(FormatTextToHtml(texts.tab1 . "`n" . texts.part1 . "`n`n" . texts.tab2 . "`n" . texts.part2))
+    doc.write(FormatTextToHtml(BuildManualText(lang, texts)))
     doc.close()
 
     ; --- Dynamic update on language change ---
@@ -255,7 +278,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
 
         doc := edtManual.Value
         doc.open()
-        doc.write(FormatTextToHtml(newTexts.tab1 . "`n" . newTexts.part1 . "`n`n" . newTexts.tab2 . "`n" . newTexts.part2))
+        doc.write(FormatTextToHtml(BuildManualText(newLang, newTexts)))
         doc.close()
     }
 

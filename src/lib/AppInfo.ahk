@@ -7,7 +7,7 @@
 
 ; =================================================================================
 ; Module: AppInfo
-; Description: Displays system diagnostic information and maintenance tools.
+; Description: Displays application details, diagnostics, paths, and support links.
 ; Author: KBPark
 ; =================================================================================
 ShowAppInformation(parentHwnd := 0) {
@@ -31,7 +31,6 @@ ShowAppInformation(parentHwnd := 0) {
             Download("https://www.google.com/s2/favicons?domain=github.com&sz=64", githubBtnPath)
         }
     }
-    settingsFolder := ConfigGetSettingsFolder()
     favoriteConfigPath := GetConfigPath("Folders")
     promptConfigPath := GetConfigPath("Prompts")
     hotstringConfigPath := GetConfigPath("Hotstrings")
@@ -88,118 +87,61 @@ ShowAppInformation(parentHwnd := 0) {
     if ConfigExists("KeyRemaps")
         remapCount := ConfigCountPairs("KeyRemaps", "Remaps")
 
-    ; 1. Stats Panel (Left)
-    infoGui.Add("GroupBox", "x20 y110 w210 h190 c" . THEME_ACCENT, "📊 System Statistics")
-    infoGui.Add("Text", "x35 y135 w180", "📁 Favorites: " . folderCount . " registered")
-    infoGui.Add("Text", "x35 y155 w180", "⌨️ Prompts: " . promptCount . " total")
-    infoGui.Add("Text", "x35 y175 w180", "✏️ Hotstrings: " . hsTotal . " total")
+    ; 1. Application Overview
+    infoGui.Add("GroupBox", "x20 y110 w440 h140 c" . THEME_ACCENT, "📊 Application Overview")
+    infoGui.Add("Text", "x35 y135 w190", "SwiftDeck version: " . g_appVersion)
+    infoGui.Add("Text", "x35 y160 w190", "📁 Favorites: " . folderCount . " registered")
+    infoGui.Add("Text", "x35 y185 w190", "⌨️ Prompts: " . promptCount . " total")
+    infoGui.Add("Text", "x245 y160 w190", "✏️ Hotstrings: " . hsTotal . " total")
     infoGui.SetFont("s9 c" . THEME_MUTED)
-    infoGui.Add("Text", "x45 y195 w170", "(Auto: " . hsSpaceCount . " / Menu: " . hsMenuCount . ")")
+    infoGui.Add("Text", "x255 y180 w180", "(Auto: " . hsSpaceCount . " / Menu: " . hsMenuCount . ")")
     infoGui.SetFont("s10 c" . THEME_TEXT)
-    infoGui.Add("Text", "x35 y245 w180", "🔀 Key Remaps: " . remapCount . " total")
+    infoGui.Add("Text", "x245 y210 w190", "🔀 Key Remaps: " . remapCount . " total")
+    infoGui.SetFont("s9 c" . THEME_MUTED)
+    infoGui.Add("Text", "x35 y212 w190 h32", "Maintenance tools:`nApp Settings → General")
+    infoGui.SetFont("s10 c" . THEME_TEXT)
 
-    ; 2. Maintenance Tools (Right)
-    infoGui.Add("GroupBox", "x245 y110 w215 h190 c" . THEME_ACCENT, "🛠️ Maintenance Tools")
-
-    btnAppFolder := infoGui.Add("Button", "x260 y145 w185 h30", "📂 Open App Folder")
-    btnAppFolder.OnEvent("Click", (*) => RunSafely("explorer.exe `"" . settingsFolder . "`"", "Open App Folder"))
-
-    btnBackup := infoGui.Add("Button", "x260 y190 w90 h30", "📥 Backup")
-    btnBackup.OnEvent("Click", (*) => BackupConfigs(true))
-
-    btnRestore := infoGui.Add("Button", "x355 y190 w90 h30", "🔄 Restore")
-    btnRestore.OnEvent("Click", (*) => RestoreConfigs())
-
-    isStartupEnabled := FileExist(A_Startup . "\SwiftDeck.lnk") || FileExist(A_Startup . "\FolderHotKey.lnk")
-    chkStartup := infoGui.Add("CheckBox", "x260 y240 w185 h35 Checked" . (isStartupEnabled ? 1 : 0), "🚀 Run app when Windows starts")
-    chkStartup.OnEvent("Click", (*) => ToggleStartup())
-
-    ToggleStartup() {
-        if (chkStartup.Value) {
-            RegisterStartup()
-        } else {
-            UnregisterStartup()
-        }
-    }
-
-    RegisterStartup() {
-        if FileExist(A_Startup . "\FolderHotKey.lnk")
-            try FileDelete(A_Startup . "\FolderHotKey.lnk")
-
-        startupLnk := A_Startup . "\SwiftDeck.lnk"
-        try {
-            if FileExist(startupLnk) {
-                FileDelete(startupLnk)
-            }
-            FileCreateShortcut(A_ScriptFullPath, startupLnk, A_ScriptDir)
-            if FileExist(startupLnk) {
-                MsgBox("🚀 Auto-Start has been successfully enabled!`nApp will now run automatically on Windows boot.", "Startup Registration", 262208)
-            } else {
-                throw Error("Shortcut creation verified but file is missing.")
-            }
-        } catch Error as err {
-            MsgBox("❌ Failed to enable Auto-Start.`n`nError: " . err.Message, "Startup Error", 262160)
-        }
-    }
-
-    UnregisterStartup() {
-        if FileExist(A_Startup . "\FolderHotKey.lnk")
-            try FileDelete(A_Startup . "\FolderHotKey.lnk")
-
-        startupLnk := A_Startup . "\SwiftDeck.lnk"
-        try {
-            if FileExist(startupLnk) {
-                FileDelete(startupLnk)
-                MsgBox("🗑️ Auto-Start has been successfully disabled.`nShortcut removed from Startup folder.", "Startup Unregistration", 262208)
-            } else {
-                MsgBox("ℹ️ Auto-Start is already disabled.`nNo shortcut found in the Startup folder.", "Startup Status", 262192)
-            }
-        } catch Error as err {
-            MsgBox("❌ Failed to disable Auto-Start.`n`nError: " . err.Message, "Startup Error", 262160)
-        }
-    }
-
-    ; 3. File Paths Section (Bottom)
-    infoGui.Add("GroupBox", "x20 y310 w440 h155 c" . THEME_ACCENT, "📂 Configuration File Paths")
+    ; 2. File Paths
+    infoGui.Add("GroupBox", "x20 y260 w440 h155 c" . THEME_ACCENT, "📂 Configuration File Paths")
 
     infoGui.SetFont("s9 c" . THEME_MUTED)
-    infoGui.Add("Text", "x35 y335 w410", "Favorites Config:")
+    infoGui.Add("Text", "x35 y285 w410", "Favorites Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y353 w345 h22 ReadOnly Background2D2D30 -Border", favoriteConfigPath)
-    btnOpenFavFile := infoGui.Add("Button", "x390 y351 w55 h24", "Open")
+    infoGui.Add("Edit", "x35 y303 w345 h22 ReadOnly Background2D2D30 -Border", favoriteConfigPath)
+    btnOpenFavFile := infoGui.Add("Button", "x390 y301 w55 h24", "Open")
     btnOpenFavFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . favoriteConfigPath . "`"", "Open Config File"))
 
     infoGui.SetFont("s9 c" . THEME_MUTED)
-    infoGui.Add("Text", "x35 y378 w410", "Quick Prompts Config:")
+    infoGui.Add("Text", "x35 y328 w410", "Quick Prompts Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y396 w345 h22 ReadOnly Background2D2D30 -Border", promptConfigPath)
-    btnOpenPrFile := infoGui.Add("Button", "x390 y394 w55 h24", "Open")
+    infoGui.Add("Edit", "x35 y346 w345 h22 ReadOnly Background2D2D30 -Border", promptConfigPath)
+    btnOpenPrFile := infoGui.Add("Button", "x390 y344 w55 h24", "Open")
     btnOpenPrFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . promptConfigPath . "`"", "Open Config File"))
 
     infoGui.SetFont("s9 c" . THEME_MUTED)
-    infoGui.Add("Text", "x35 y421 w410", "Hotstrings Config:")
+    infoGui.Add("Text", "x35 y371 w410", "Hotstrings Config:")
     infoGui.SetFont("s9 c" . THEME_TEXT)
-    infoGui.Add("Edit", "x35 y439 w345 h22 ReadOnly Background2D2D30 -Border", hotstringConfigPath)
-    btnOpenHsFile := infoGui.Add("Button", "x390 y437 w55 h24", "Open")
+    infoGui.Add("Edit", "x35 y389 w345 h22 ReadOnly Background2D2D30 -Border", hotstringConfigPath)
+    btnOpenHsFile := infoGui.Add("Button", "x390 y387 w55 h24", "Open")
     btnOpenHsFile.OnEvent("Click", (*) => RunSafely("notepad.exe `"" . hotstringConfigPath . "`"", "Open Config File"))
     infoGui.SetFont("s10 c" . THEME_TEXT)
 
-    ; 4. Support Developer Section (Very Bottom)
-    infoGui.Add("GroupBox", "x20 y475 w440 h115 c" . THEME_ACCENT, "☕ Support the Developer")
-    infoGui.Add("Text", "x35 y497 w410", "If this tool helps your daily workflow, consider buying a coffee!")
+    ; 3. Support Developer
+    infoGui.Add("GroupBox", "x20 y425 w440 h115 c" . THEME_ACCENT, "☕ Support the Developer")
+    infoGui.Add("Text", "x35 y447 w410", "If this tool helps your daily workflow, consider buying a coffee!")
 
     if FileExist(bmcBtnPath) {
-        picCoffee := infoGui.Add("Picture", "x130 y520 w217 h60 BackgroundTrans", bmcBtnPath)
+        picCoffee := infoGui.Add("Picture", "x130 y470 w217 h60 BackgroundTrans", bmcBtnPath)
         picCoffee.OnEvent("Click", (*) => RunSafely("https://www.buymeacoffee.com/KBPark_Bob", "Open Support Page"))
     } else {
         infoGui.SetFont("s11 cBlack bold", "Segoe UI")
-        btnCoffee := infoGui.Add("Text", "x130 y525 w220 h45 Center +0x200 +Border BackgroundFF813F", "☕ Buy Me a Coffee")
+        btnCoffee := infoGui.Add("Button", "x130 y475 w220 h45", "☕ Buy Me a Coffee")
         btnCoffee.OnEvent("Click", (*) => RunSafely("https://www.buymeacoffee.com/KBPark_Bob", "Open Support Page"))
         infoGui.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
     }
 
-    btnClose := infoGui.Add("Button", "x180 y605 w120 h35 Default", "Close")
+    btnClose := infoGui.Add("Button", "x180 y555 w120 h35 Default", "Close")
     btnClose.OnEvent("Click", (*) => CleanUpAndClose())
 
-    ShowCenteredOnMouse(infoGui, "w480 h655")
+    ShowCenteredOnMouse(infoGui, "w480 h605")
 }

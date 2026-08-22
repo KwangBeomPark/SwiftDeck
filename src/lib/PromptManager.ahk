@@ -84,6 +84,7 @@ class PromptManager {
     __New(parentGui := "") {
         this.parentGui := parentGui
         this.localData := ConfigReadPromptData()
+        this.dirtyState := false
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -99,7 +100,11 @@ class PromptManager {
 
     BuildUI(guiObj) {
         startX := this.parentGui ? 30 : 30
-        startY := this.parentGui ? 120 : 20
+        startY := this.parentGui ? 105 : 20
+        listHeight := this.parentGui ? 165 : 210
+        previewLabelOffset := this.parentGui ? 230 : 275
+        previewEditOffset := this.parentGui ? 250 : 295
+        saveOffset := this.parentGui ? 365 : 410
         this.mainHwnd := guiObj.Hwnd
         if (!this.parentGui)
             guiObj.OnEvent("Close", (*) => guiObj.Destroy())
@@ -110,37 +115,41 @@ class PromptManager {
         keySuffix := migrated.UseNumpad ? "Numpad" : "Number"
         slotText := "① Select Slot (" . friendlyMod . keySuffix . "):"
 
+        slotChoices := []
+        loop 10 {
+            slotNum := Mod(A_Index, 10)
+            slotChoices.Push(keySuffix . " " . slotNum)
+        }
+
         guiObj.Add("Text", "x" . startX . " y" . startY . " w300", slotText)
 
         guiObj.SetFont("cBlack")
-        this.ddlNumpad := guiObj.Add("DropDownList", "x" . (startX + 220) . " y" . (startY - 5) . " w180 Choose1", [
-            "Numpad 1", "Numpad 2", "Numpad 3",
-            "Numpad 4", "Numpad 5", "Numpad 6", "Numpad 7", "Numpad 8", "Numpad 9", "Numpad 0"])
+        this.ddlNumpad := guiObj.Add("DropDownList", "x" . (startX + 220) . " y" . (startY - 5) . " w180 Choose1", slotChoices)
         guiObj.SetFont("c" . THEME_TEXT)
 
         guiObj.Add("Text", "x" . startX . " y" . (startY + 35) . " w200", "② Prompts in this Slot:")
 
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 55) . " w320 h210")
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 55) . " w320 h" . listHeight)
         guiObj.SetFont("c" . THEME_TEXT)
 
-        guiObj.Add("Text", "x" . startX . " y" . (startY + 275) . " w200", "③ Content Preview:")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + previewLabelOffset) . " w200", "③ Content Preview:")
 
         guiObj.SetFont("c444444")
-        this.edtPreview := guiObj.Add("Edit", "x" . startX . " y" . (startY + 295) . " w400 h105 ReadOnly Multi BackgroundD4D4D4", "")
+        this.edtPreview := guiObj.Add("Edit", "x" . startX . " y" . (startY + previewEditOffset) . " w400 h105 ReadOnly Multi BackgroundD4D4D4", "")
         guiObj.SetFont("c" . THEME_TEXT)
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Text", "x" . (startX + 330) . " y" . (startY + 25) . " w70 h25 Center +0x200 +Border Background2D2D30", "⚠️ Reset")
-        btnReset.OnEvent("Click", (*) => ResetToDefaults("Prompts"))
+        btnReset := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 25) . " w70 h25", "⚠️ Reset")
+        btnReset.OnEvent("Click", (*) => this.RequestReset())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         btnNew := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 55) . " w70 h35", "➕ New")
         btnEdit := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 95) . " w70 h35", "✏️ Edit")
         btnDel := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 135) . " w70 h35", "❌ Delete")
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
-        btnUp := guiObj.Add("Text", "x" . (startX + 330) . " y" . (startY + 175) . " w70 h35 Center +0x200 +Border Background000000", "▲ Up")
-        btnDown := guiObj.Add("Text", "x" . (startX + 330) . " y" . (startY + 215) . " w70 h35 Center +0x200 +Border Background000000", "▼ Down")
+        btnUp := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 175) . " w70 h35", "▲ Up")
+        btnDown := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 215) . " w70 h35", "▼ Down")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         if (!this.parentGui) {
@@ -158,8 +167,8 @@ class PromptManager {
         btnDown.OnEvent("Click", (*) => this.MoveItem(1))
 
         guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        btnSave := guiObj.Add("Text", "x" . startX . " y" . (startY + 410) . " w400 h35 Center +0x200 +Border Background4A4F54", "💾 Save & Apply")
-        btnSave.OnEvent("Click", (*) => this.SaveSettings())
+        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w400 h35", "💾 Save && Apply")
+        this.btnSave.OnEvent("Click", (*) => this.SaveSettings())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         this.RefreshList()
@@ -197,8 +206,8 @@ class PromptManager {
         ddlLang := popup.Add("DropDownList", "x145 y65 w80 Choose1", ["Korean", "English", "Polish", "German", "French", "Spanish"])
 
         popup.SetFont("s9 cWhite Bold", "Segoe UI")
-        btnTranslate := popup.Add("Text", "x230 y65 w80 h24 Center +0x200 +Border Background107C41", "🌐 Translate")
-        btnInsertKey := popup.Add("Text", "x315 y65 w100 h24 Center +0x200 +Border Background0078D7", "Insert Key ▼")
+        btnTranslate := popup.Add("Button", "x230 y65 w80 h24", "🌐 Translate")
+        btnInsertKey := popup.Add("Button", "x315 y65 w100 h24", "Insert Key ▼")
         popup.SetFont("s10 cBlack norm", "Segoe UI")
 
         edtMsg := popup.Add("Edit", "x15 y95 w400 h120 Multi", mVal)
@@ -277,7 +286,7 @@ class PromptManager {
         }
 
         popup.SetFont("s10 cWhite bold", "Segoe UI")
-        btnConfirm := popup.Add("Text", "x225 y230 w190 h35 Center +0x200 +Border Background0078D7", isEdit ? "💾 Modify Prompt" : "➕ Add Prompt")
+        btnConfirm := popup.Add("Button", "x225 y230 w190 h35", isEdit ? "💾 Modify Prompt" : "➕ Add Prompt")
         popup.SetFont("s10 cBlack norm", "Segoe UI")
         btnConfirm.OnEvent("Click", (*) => OnConfirm())
 
@@ -304,6 +313,7 @@ class PromptManager {
             }
 
             this.RefreshList(isEdit ? editIdx : this.localData[currNum].Length)
+            this.MarkDirty()
             CleanUpAndClose()
             ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
@@ -362,6 +372,7 @@ class PromptManager {
         this.localData[currNum][targetIdx] := temp
 
         this.RefreshList(targetIdx)
+        this.MarkDirty()
     }
 
     DeleteItem() {
@@ -379,14 +390,39 @@ class PromptManager {
         this.localData[currNum].RemoveAt(selIdx)
 
         this.RefreshList(selIdx > this.localData[currNum].Length ? this.localData[currNum].Length : selIdx)
+        this.MarkDirty()
         ToolTip("✅ Deleted. Click Save & Apply.")
         SetTimer(() => ToolTip(), -2000)
     }
 
-    SaveSettings() {
+    IsDirty() {
+        return this.dirtyState
+    }
+
+    RequestReset() {
+        if (this.HasOwnProp("dashboardResetHandler"))
+            this.dashboardResetHandler.Call("Prompts")
+        else
+            ResetToDefaults("Prompts")
+    }
+
+    MarkDirty() {
+        this.dirtyState := true
+        UpdateSaveButtonState(this.btnSave, true)
+    }
+
+    MarkClean() {
+        this.dirtyState := false
+        UpdateSaveButtonState(this.btnSave, false)
+    }
+
+    SaveSettings(showFeedback := true) {
         ConfigWritePromptData(this.localData)
-        ToolTip("✅ Saved & Applied")
-        SetTimer(() => ToolTip(), -2000)
+        this.MarkClean()
+        if (showFeedback) {
+            ToolTip("✅ Saved & Applied")
+            SetTimer(() => ToolTip(), -2000)
+        }
     }
 }
 

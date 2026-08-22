@@ -52,8 +52,8 @@ ShowFavoritesMenu() {
     ; Add current folder and settings entry
     mainHotkeyStr := ConfigReadAppSettings().MainHotkey
     
-    friendlyMainHotkey := FormatHotkeyDisplay(mainHotkeyStr)
-    addFolderMenuText := "⭐ Add Current Folder  [Ctrl+" . friendlyMainHotkey . "]"
+    addFolderHotkey := GetAddFolderHotkey(mainHotkeyStr)
+    addFolderMenuText := "⭐ Add Current Folder  [" . FormatHotkeyDisplay(addFolderHotkey) . "]"
 
     mainContextMenu.Add(addFolderMenuText, (*) => AddCurrentExplorerFolder())
     if (GetActiveExplorerPath() == "") {

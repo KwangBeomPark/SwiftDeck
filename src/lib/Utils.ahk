@@ -107,6 +107,77 @@ BuildKeyString(ctrl, shift, win, alt, baseKey) {
     return prefix . baseKey
 }
 
+NormalizeHotkey(hotkeyText) {
+    parsed := ParseKeyString(hotkeyText)
+    return StrLower(BuildKeyString(
+        parsed.Mods.Ctrl,
+        parsed.Mods.Shift,
+        parsed.Mods.Win,
+        parsed.Mods.Alt,
+        parsed.BaseKey
+    ))
+}
+
+GetAddFolderHotkey(mainHotkey) {
+    parsed := ParseKeyString(mainHotkey)
+    mods := parsed.Mods
+
+    ; Add the first unused modifier so the Explorer action never collides with
+    ; the Favorites Menu. The default remains F1 -> Ctrl+F1.
+    if (!mods.Ctrl)
+        mods.Ctrl := 1
+    else if (!mods.Shift)
+        mods.Shift := 1
+    else if (!mods.Alt)
+        mods.Alt := 1
+    else if (!mods.Win)
+        mods.Win := 1
+    else
+        ; No unused modifier remains. Keep a predictable, usable fallback
+        ; (Ctrl + the same base key); central validation still checks it
+        ; against every other registered shortcut.
+        return "^" . parsed.BaseKey
+
+    return BuildKeyString(mods.Ctrl, mods.Shift, mods.Win, mods.Alt, parsed.BaseKey)
+}
+
+GetPromptMenuHotkey() {
+    return "+#Space"
+}
+
+ValidateHotkeyAssignments(mainHotkey, promptModifier, promptUseNumpad, emojiHotkey, exitHotkey, promptMenuHotkey := "") {
+    if (promptMenuHotkey == "")
+        promptMenuHotkey := GetPromptMenuHotkey()
+    assignments := [
+        { Name: "Favorites Menu", Hotkey: mainHotkey },
+        { Name: "Add Current Explorer Folder", Hotkey: GetAddFolderHotkey(mainHotkey) },
+        { Name: "Prompt Popup Menu", Hotkey: promptMenuHotkey },
+        { Name: "Emoji & Symbols", Hotkey: emojiHotkey },
+        { Name: "Exit App", Hotkey: exitHotkey }
+    ]
+
+    if (promptModifier != "") {
+        loop 10 {
+            num := A_Index - 1
+            baseKey := promptUseNumpad ? "Numpad" . num : num
+            assignments.Push({ Name: "Quick Prompt " . num, Hotkey: promptModifier . baseKey })
+        }
+    }
+
+    seen := Map()
+    for assignment in assignments {
+        normalized := NormalizeHotkey(assignment.Hotkey)
+        if (normalized == "")
+            continue
+        if (seen.Has(normalized)) {
+            return assignment.Name . " conflicts with " . seen[normalized]
+                . " (" . FormatHotkeyDisplay(assignment.Hotkey) . ")."
+        }
+        seen[normalized] := assignment.Name
+    }
+    return ""
+}
+
 FormatHotkeyDisplay(hotkeyLabel) {
     formattedHK := hotkeyLabel
     ; Replace "+" (Shift) first so the "+" introduced by later replacements
@@ -276,7 +347,7 @@ ShowCenteredOnMouse(guiObj, options := "") {
     idx := MonitorGetPrimary()
     loop monitorCount {
         MonitorGet(A_Index, &L, &T, &R, &B)
-        if (mX >= L && mX <= R && mY >= T && mY <= B) {
+        if (mX >= L && mX < R && mY >= T && mY < B) {
             idx := A_Index
             break
         }
@@ -284,10 +355,23 @@ ShowCenteredOnMouse(guiObj, options := "") {
     
     ; Use WorkArea to avoid taskbar overlap
     MonitorGetWorkArea(idx, &WL, &WT, &WR, &WB)
-    cX := WL + (WR - WL - gW) // 2
-    cY := WT + (WB - WT - gH) // 2
+    centeredPos := CalculateCenteredWindowPosition(gW, gH, WL, WT, WR, WB)
     
     ; WinMove uses physical screen coordinates regardless of DPIScale
-    WinMove(cX, cY, , , guiObj.Hwnd)
+    WinMove(centeredPos.X, centeredPos.Y, , , guiObj.Hwnd)
     guiObj.Show(options)
+}
+
+CalculateCenteredWindowPosition(guiWidth, guiHeight, workLeft, workTop, workRight, workBottom) {
+    workWidth := Max(0, workRight - workLeft)
+    workHeight := Max(0, workBottom - workTop)
+    x := guiWidth >= workWidth ? workLeft : workLeft + (workWidth - guiWidth) // 2
+    y := guiHeight >= workHeight ? workTop : workTop + (workHeight - guiHeight) // 2
+    return { X: x, Y: y }
+}
+
+UpdateSaveButtonState(buttonCtrl, isDirty) {
+    buttonCtrl.Text := isDirty
+        ? "● Save && Apply (Unsaved)"
+        : "💾 Save && Apply"
 }

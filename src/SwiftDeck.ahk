@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName SwiftDeck
-;@Ahk2Exe-SetVersion 1.1.2.0
+;@Ahk2Exe-SetVersion 1.2.0.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
 ;@Ahk2Exe-SetMainIcon ..\assets\SwiftDeck.ico
 
@@ -10,7 +10,7 @@
 ; =============================================================================
 
 ; [Global] Display version shown in the app UI
-global g_appVersion := "1.1.2"
+global g_appVersion := "1.2.0"
 
 ; [Global] Path configuration (migrate legacy folder name)
 if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
@@ -126,11 +126,11 @@ OnStartup() {
 
     ; Register Emoji Picker, Prompt Menu, and Exit hotkeys
     try Hotkey(settings.EmojiHotkey, (*) => g_emojiMenu.Show())
-    try Hotkey("+#Space", (*) => ShowPromptMenu())  ; Shift+Win+Space → Prompt Popup Menu
-    try Hotkey(settings.ExitHotkey, (*) => ExitApp())
+    try Hotkey(GetPromptMenuHotkey(), (*) => ShowPromptMenu())  ; Shift+Win+Space → Prompt Popup Menu
+    try Hotkey(settings.ExitHotkey, RequestExitApp)
 
     ; Register dynamic "Add Current Explorer Folder" hotkey (Ctrl + mainHotkey)
-    addFolderHotkey := "^" . settings.MainHotkey
+    addFolderHotkey := GetAddFolderHotkey(settings.MainHotkey)
     HotIf((*) => GetActiveExplorerPath() != "")
     try {
         Hotkey(addFolderHotkey, (*) => AddCurrentExplorerFolder())
@@ -159,6 +159,12 @@ BindPrompt(num) {
     return (*) => PromptManager.ProcessQuickPrompt(num)
 }
 
+RequestExitApp(*) {
+    if (DashboardManager.instance && !DashboardManager.instance.ConfirmUnsavedChanges("exit"))
+        return
+    ExitApp()
+}
+
 SetupTrayMenu(settings) {
     global g_emojiMenu
     A_TrayMenu.Delete() ; Remove default AHK tray items (Open, Pause, Exit, etc.)
@@ -166,7 +172,7 @@ SetupTrayMenu(settings) {
     ; Format hotkey hints so every actionable item advertises its shortcut
     mainHK := FormatHotkeyDisplay(settings.MainHotkey)
     emojiHK := FormatHotkeyDisplay(settings.EmojiHotkey)
-    promptMenuHK := FormatHotkeyDisplay("+#Space") ; Shift+Win+Space (registered in OnStartup)
+    promptMenuHK := FormatHotkeyDisplay(GetPromptMenuHotkey())
     exitHK := FormatHotkeyDisplay(settings.ExitHotkey)
 
     foldersLabel := "📂 Open Folders Menu (" . mainHK . ")"
@@ -181,7 +187,7 @@ SetupTrayMenu(settings) {
     A_TrayMenu.Add("ℹ️ App Information", (*) => ShowAppInformation())
     A_TrayMenu.Add()
     A_TrayMenu.Add("🔄 Reload App", (*) => Reload())
-    A_TrayMenu.Add("❌ Exit App (" . exitHK . ")", (*) => ExitApp())
+    A_TrayMenu.Add("❌ Exit App (" . exitHK . ")", RequestExitApp)
 
     ; Double-click tray icon to open favorites menu
     A_TrayMenu.Default := foldersLabel
@@ -192,9 +198,9 @@ ShowHotkeyCheatSheet() {
     settings := ConfigReadAppSettings()
 
     mainHK := FormatHotkeyDisplay(settings.MainHotkey)
-    addHK := FormatHotkeyDisplay("^" . settings.MainHotkey)
+    addHK := FormatHotkeyDisplay(GetAddFolderHotkey(settings.MainHotkey))
     emojiHK := FormatHotkeyDisplay(settings.EmojiHotkey)
-    promptMenuHK := FormatHotkeyDisplay("+#Space")
+    promptMenuHK := FormatHotkeyDisplay(GetPromptMenuHotkey())
     exitHK := FormatHotkeyDisplay(settings.ExitHotkey)
 
     if (settings.PromptModifier != "") {

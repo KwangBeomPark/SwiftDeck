@@ -20,6 +20,7 @@ class FolderManager {
     __New(parentGui := "") {
         this.orderedItems := FolderManager.ReadFolderItems()
         this.parentGui := parentGui
+        this.dirtyState := false
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -36,14 +37,19 @@ class FolderManager {
     BuildUI(guiObj) {
         this.mainHwnd := guiObj.Hwnd
         startX := this.parentGui ? 35 : 25
-        startY := this.parentGui ? 115 : 80
+        startY := this.parentGui ? 105 : 80
+        listHeight := this.parentGui ? 300 : 345
+        moveUpOffset := this.parentGui ? 245 : 290
+        moveDownOffset := this.parentGui ? 285 : 330
+        saveOffset := this.parentGui ? 340 : 385
+        hintOffset := this.parentGui ? 390 : 435
         guiObj.SetFont("s10", "Segoe UI")
 
         guiObj.Add("Text", "x" . startX . " y" . startY . " w400", "Saved Folders:")
 
         ; Set ListBox text color to black (for readability on white background)
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h345")
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h" . listHeight)
         guiObj.SetFont("c" . THEME_TEXT)
 
         btnAddDir := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 25) . " w85 h35", "➕ New")
@@ -52,19 +58,19 @@ class FolderManager {
         btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 145) . " w85 h35", "❌ Delete")
 
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
-        btnUp := guiObj.Add("Text", "x" . (startX + 320) . " y" . (startY + 290) . " w85 h35 Center +0x200 +Border Background000000", "▲ Up")
-        btnDown := guiObj.Add("Text", "x" . (startX + 320) . " y" . (startY + 330) . " w85 h35 Center +0x200 +Border Background000000", "▼ Down")
+        btnUp := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveUpOffset) . " w85 h35", "▲ Up")
+        btnDown := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveDownOffset) . " w85 h35", "▼ Down")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Text", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25 Center +0x200 +Border Background2D2D30", "⚠️ Reset")
-        btnReset.OnEvent("Click", (*) => ResetToDefaults("Favorites"))
+        btnReset := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25", "⚠️ Reset")
+        btnReset.OnEvent("Click", (*) => this.RequestReset())
 
         guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        btnSave := guiObj.Add("Text", "x" . startX . " y" . (startY + 385) . " w405 h40 Center +0x200 +Border Background4A4F54", "💾 Save & Apply")
+        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w405 h40", "💾 Save && Apply")
         guiObj.SetFont("c" . THEME_TEXT . " norm", "Segoe UI")
 
-        guiObj.Add("Text", "x" . startX . " y" . (startY + 435) . " w405 c" . THEME_MUTED . " Center", "💡 Press the Folder Menu Hotkey (default: F1) anywhere to open this menu.")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + hintOffset) . " w405 c" . THEME_MUTED . " Center", "💡 Press the Folder Menu Hotkey (default: F1) anywhere to open this menu.")
 
         if (!this.parentGui) {
             btnClose := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 465) . " w85 h35", "Close")
@@ -80,7 +86,7 @@ class FolderManager {
         btnDel.OnEvent("Click", (*) => this.DeleteItem())
         btnUp.OnEvent("Click", (*) => this.MoveItem(-1))
         btnDown.OnEvent("Click", (*) => this.MoveItem(1))
-        btnSave.OnEvent("Click", (*) => this.SaveAndClose(guiObj))
+        this.btnSave.OnEvent("Click", (*) => this.SaveAndClose(guiObj))
     }
 
     RefreshList(targetIdx := 0) {
@@ -115,6 +121,7 @@ class FolderManager {
         this.orderedItems[targetIdx] := temp
 
         this.RefreshList(targetIdx)
+        this.MarkDirty()
     }
 
     DeleteItem() {
@@ -130,11 +137,13 @@ class FolderManager {
 
         this.orderedItems.RemoveAt(idx)
         this.RefreshList(idx > this.orderedItems.Length ? this.orderedItems.Length : idx)
+        this.MarkDirty()
     }
 
     AddSeparator() {
         this.orderedItems.Push({ Name: "-", Path: "-" })
         this.RefreshList(this.orderedItems.Length)
+        this.MarkDirty()
     }
 
     AddFolderItem(folderName, folderPath) {
@@ -145,6 +154,7 @@ class FolderManager {
         }
         this.orderedItems.Push({ Name: folderName, Path: folderPath })
         this.RefreshList(this.orderedItems.Length)
+        this.MarkDirty()
         return true
     }
 
@@ -188,7 +198,7 @@ class FolderManager {
         }
 
         popup.SetFont("s10 cWhite bold", "Segoe UI")
-        btnConfirm := popup.Add("Text", "x215 y200 w200 h35 Center +0x200 +Border Background0078D7", "💾 Save Changes")
+        btnConfirm := popup.Add("Button", "x215 y200 w200 h35", "💾 Save Changes")
         popup.SetFont("s10 cBlack norm", "Segoe UI")
         btnConfirm.OnEvent("Click", (*) => OnConfirm())
 
@@ -211,6 +221,7 @@ class FolderManager {
             this.orderedItems[idx].Path := p
 
             this.RefreshList(idx)
+            this.MarkDirty()
             CleanUpAndClose()
             ToolTip("✅ Modified. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
@@ -267,10 +278,38 @@ class FolderManager {
     }
 
     SaveAndClose(guiObj) {
-        FolderManager.WriteFolderItems(this.orderedItems)
+        this.SaveSettings()
         if (!this.parentGui)
             guiObj.Destroy()
-        ToolTip("✅ Saved successfully")
-        SetTimer(() => ToolTip(), -2000)
+    }
+
+    IsDirty() {
+        return this.dirtyState
+    }
+
+    RequestReset() {
+        if (this.HasOwnProp("dashboardResetHandler"))
+            this.dashboardResetHandler.Call("Favorites")
+        else
+            ResetToDefaults("Favorites")
+    }
+
+    MarkDirty() {
+        this.dirtyState := true
+        UpdateSaveButtonState(this.btnSave, true)
+    }
+
+    MarkClean() {
+        this.dirtyState := false
+        UpdateSaveButtonState(this.btnSave, false)
+    }
+
+    SaveSettings(showFeedback := true) {
+        FolderManager.WriteFolderItems(this.orderedItems)
+        this.MarkClean()
+        if (showFeedback) {
+            ToolTip("✅ Saved successfully")
+            SetTimer(() => ToolTip(), -2000)
+        }
     }
 }

@@ -127,6 +127,61 @@ BackupConfigs(showMsg := false) {
     }
 }
 
+ConfigIsStartupEnabled() {
+    return (FileExist(A_Startup . "\SwiftDeck.lnk")
+        || FileExist(A_Startup . "\FolderHotKey.lnk")) ? 1 : 0
+}
+
+ConfigSetStartupEnabled(enabled, showMsg := true) {
+    startupLnk := A_Startup . "\SwiftDeck.lnk"
+    legacyLnk := A_Startup . "\FolderHotKey.lnk"
+
+    try {
+        if (enabled) {
+            pendingLnk := A_Startup . "\SwiftDeck.pending." . A_TickCount . ".lnk"
+            try {
+                FileCreateShortcut(A_ScriptFullPath, pendingLnk, A_ScriptDir)
+                if !FileExist(pendingLnk)
+                    throw Error("The startup shortcut could not be verified.")
+                FileMove(pendingLnk, startupLnk, true)
+            } finally {
+                if FileExist(pendingLnk)
+                    try FileDelete(pendingLnk)
+            }
+
+            if FileExist(legacyLnk)
+                FileDelete(legacyLnk)
+            if !FileExist(startupLnk)
+                throw Error("The startup shortcut is missing after registration.")
+
+            if (showMsg)
+                MsgBox("🚀 Auto-Start is enabled.`nSwiftDeck will run automatically when Windows starts.", "Startup Registration", 262208)
+        } else {
+            hadShortcut := FileExist(startupLnk) || FileExist(legacyLnk)
+            if FileExist(startupLnk)
+                FileDelete(startupLnk)
+            if FileExist(legacyLnk)
+                FileDelete(legacyLnk)
+            if ConfigIsStartupEnabled()
+                throw Error("A startup shortcut could not be removed.")
+
+            if (showMsg) {
+                msg := hadShortcut
+                    ? "🗑️ Auto-Start is disabled.`nThe shortcut was removed from the Startup folder."
+                    : "ℹ️ Auto-Start is already disabled."
+                MsgBox(msg, "Startup Status", 262208)
+            }
+        }
+        return true
+    } catch Error as err {
+        if (showMsg) {
+            actionLabel := enabled ? "enable" : "disable"
+            MsgBox("❌ Failed to " . actionLabel . " Auto-Start.`n`nError: " . err.Message, "Startup Error", 262160)
+        }
+        return false
+    }
+}
+
 RestoreConfigs() {
     global g_targetFolder
     backupDir := g_targetFolder . "Backups\"

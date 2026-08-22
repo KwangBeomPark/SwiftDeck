@@ -79,12 +79,10 @@ Release binaries should be uploaded to GitHub Releases, not committed to the rep
 ✔ **Prompts**: Execute repetitive text strings and control-key macros such as `{Wait}`, `{Enter}`, and `{Tab}`. Supports `{Ctrl+S}`, `{Alt+Tab}`, and other shortcut combos.  
 ✔ **Hotstrings**: Register text abbreviations for instant auto-completion triggered by a space or Enter key.  
 ✔ **Key Remap**: Map physical keys to more useful shortcuts or mouse clicks.  
-✔ **General**: Toggle Windows startup behavior and manage the application theme.  
-✔ After adding, editing, or deleting items in App Settings, click **Save & Apply** to save and reload the configuration.
+✔ **General**: Manage hotkeys, Windows startup, the settings folder, saved-setting backups, restore, and factory reset.<br>
+✔ After adding, editing, or deleting items, click **Save & Apply**. Closing the settings window or exiting SwiftDeck with pending edits offers **Save All**, **Discard**, or **Keep Editing**.
 
-<p align="center">
-  <img src="./assets/manual1.png" width="1000" alt="SwiftDeck User Manual Screenshot">
-</p>
+> Open **App Settings → Manual** for the built-in guide. Its shortcut summary is generated from the settings currently active on your PC.
 
 ---
 
@@ -96,7 +94,7 @@ Release binaries should be uploaded to GitHub Releases, not committed to the rep
 | `Win + Numpad (0~9)` | Execute registered prompt slots directly by number |
 | `Shift + Win + Space` | Open the **Quick Prompt Popup Menu** at mouse position |
 | `Ctrl + Win + Space` | Open the emoji and symbol picker |
-| `Ctrl + F1` | Add the current Explorer folder to Favorites instantly |
+| `Ctrl + F1` (Default) | Add the current Explorer folder to Favorites. If the Favorites hotkey changes, SwiftDeck derives and displays a non-conflicting related shortcut. |
 | `;abbreviation` e.g. `;t1` | Expand a hotstring into long text or an email template |
 | `System Tray Menu` | Open App Settings and related management menus |
 
@@ -111,6 +109,13 @@ You can open the settings folder from:
 ```text
 System Tray Menu → Open Settings Folder
 ```
+
+The same actions are available in **App Settings → General → Data, Startup & Recovery**:
+
+- **Open Folder** opens the local settings directory.
+- **Backup Saved** backs up the last saved configuration. Click **Save & Apply** first if the dashboard shows unsaved changes.
+- **Restore** confirms before replacing the current configuration and then reloads SwiftDeck.
+- **Factory Reset** preserves backups but replaces active settings with defaults after confirmation.
 
 For team deployment, one manager can configure common folder paths, prompts, and hotstrings first, then share the generated `.ini` files with colleagues. Each team member simply places the files in the correct location and reloads the app — no additional setup required.
 

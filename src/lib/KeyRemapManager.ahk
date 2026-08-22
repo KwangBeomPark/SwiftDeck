@@ -12,6 +12,7 @@ class KeyRemapManager {
     __New(parentGui := "") {
         this.parentGui := parentGui
         this.localData := ConfigReadKeyRemaps()
+        this.dirtyState := false
 
         if (parentGui)
             this.BuildUI(parentGui)
@@ -28,22 +29,25 @@ class KeyRemapManager {
 
     BuildUI(guiObj) {
         startX := this.parentGui ? 35 : 25
-        startY := this.parentGui ? 115 : 80
+        startY := this.parentGui ? 105 : 80
+        listHeight := this.parentGui ? 290 : 345
+        exampleOffset := this.parentGui ? 320 : 375
+        saveOffset := this.parentGui ? 365 : 420
         guiObj.SetFont("s10", "Segoe UI")
         this.mainHwnd := guiObj.Hwnd
 
         guiObj.Add("Text", "x" . startX . " y" . startY . " w400", "① Active Key Mappings:")
 
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h345")
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h" . listHeight)
 
         guiObj.SetFont("s9 c888888 norm", "Segoe UI")
-        guiObj.Add("Text", "x" . startX . " y" . (startY + 375) . " w310 BackgroundTrans", "e.g.) Caps Lock → Left Click")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + exampleOffset) . " w310 BackgroundTrans", "e.g.) Caps Lock → Left Click")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Text", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25 Center +0x200 +Border Background2D2D30", "⚠️ Reset")
-        btnReset.OnEvent("Click", (*) => ResetToDefaults("Key Remaps"))
+        btnReset := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25", "⚠️ Reset")
+        btnReset.OnEvent("Click", (*) => this.RequestReset())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         btnAdd := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 25) . " w85 h35", "➕ New")
@@ -56,8 +60,8 @@ class KeyRemapManager {
         }
 
         guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        btnSave := guiObj.Add("Text", "x" . startX . " y" . (startY + 420) . " w405 h35 Center +0x200 +Border Background4A4F54", "💾 Save & Apply")
-        btnSave.OnEvent("Click", (*) => this.SaveSettings())
+        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w405 h35", "💾 Save && Apply")
+        this.btnSave.OnEvent("Click", (*) => this.SaveSettings())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         this.RefreshList()
@@ -180,6 +184,7 @@ class KeyRemapManager {
 
         this.localData.RemoveAt(idx)
         this.RefreshList(idx > this.localData.Length ? this.localData.Length : idx)
+        this.MarkDirty()
         ToolTip("✅ Deleted. Click Save & Apply.")
         SetTimer(() => ToolTip(), -2000)
     }
@@ -269,7 +274,7 @@ class KeyRemapManager {
 
         ; Action buttons
         popup.SetFont("s10 cWhite bold", "Segoe UI")
-        btnConfirm := popup.Add("Text", "x240 y230 w225 h35 Center +0x200 +Border Background0078D7", isEdit ? "💾 Modify Mapping" : "➕ Add Mapping")
+        btnConfirm := popup.Add("Button", "x240 y230 w225 h35", isEdit ? "💾 Modify Mapping" : "➕ Add Mapping")
         popup.SetFont("s10 cBlack norm", "Segoe UI")
         btnConfirm.OnEvent("Click", (*) => OnConfirm())
 
@@ -329,6 +334,7 @@ class KeyRemapManager {
             }
 
             this.RefreshList(isEdit ? editIdx : this.localData.Length)
+            this.MarkDirty()
             CleanUpAndClose()
             ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
             SetTimer(() => ToolTip(), -2000)
@@ -337,11 +343,35 @@ class KeyRemapManager {
         ShowCenteredOnMouse(popup, "w480 h280")
     }
 
-    SaveSettings() {
+    IsDirty() {
+        return this.dirtyState
+    }
+
+    RequestReset() {
+        if (this.HasOwnProp("dashboardResetHandler"))
+            this.dashboardResetHandler.Call("Key Remaps")
+        else
+            ResetToDefaults("Key Remaps")
+    }
+
+    MarkDirty() {
+        this.dirtyState := true
+        UpdateSaveButtonState(this.btnSave, true)
+    }
+
+    MarkClean() {
+        this.dirtyState := false
+        UpdateSaveButtonState(this.btnSave, false)
+    }
+
+    SaveSettings(showFeedback := true) {
         ConfigWriteKeyRemaps(this.localData)
         LoadKeyRemaps()
-        ToolTip("✅ Saved & Applied")
-        SetTimer(() => ToolTip(), -2000)
+        this.MarkClean()
+        if (showFeedback) {
+            ToolTip("✅ Saved & Applied")
+            SetTimer(() => ToolTip(), -2000)
+        }
     }
 }
 
