@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName SwiftDeck
-;@Ahk2Exe-SetVersion 1.2.0.0
+;@Ahk2Exe-SetVersion 1.3.0.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
 ;@Ahk2Exe-SetMainIcon ..\assets\SwiftDeck.ico
 
@@ -10,7 +10,7 @@
 ; =============================================================================
 
 ; [Global] Display version shown in the app UI
-global g_appVersion := "1.2.0"
+global g_appVersion := "1.3.0"
 
 ; [Global] Path configuration (migrate legacy folder name)
 if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
@@ -73,6 +73,7 @@ if FileExist(appIconPath) {
 #Include lib\HotstringManager.ahk
 #Include lib\KeyRemapManager.ahk
 #Include lib\EmojiPicker.ahk
+#Include lib\UpdateManager.ahk
 #Include lib\DashboardManager.ahk
 #Include lib\AppInfo.ahk
 #Include lib\Manual.ahk
@@ -80,7 +81,10 @@ if FileExist(appIconPath) {
 ; =============================================================================
 ; SECTION: Application Startup
 ; =============================================================================
+if UpdateManager.HandleStartupArguments()
+    ExitApp()
 OnStartup() ; Invoked immediately on script start
+UpdateManager.CompletePendingStartup()
 
 OnStartup() {
     isFirstRun := ConfigIsFirstRun()
@@ -142,6 +146,10 @@ OnStartup() {
     ; Setup custom tray menu
     SetupTrayMenu(settings)
 
+    ; Load cached release state immediately and schedule a delayed GitHub check
+    ; at most once every 24 hours. The request itself uses bounded timeouts.
+    UpdateManager.Initialize(g_appVersion)
+
     ; Show a concise hotkey cheat sheet on first run (manual stays available in the tray)
     if (isFirstRun) {
         SetTimer(() => ShowHotkeyCheatSheet(), -1000) ; Show cheat sheet after 1 second
@@ -185,6 +193,7 @@ SetupTrayMenu(settings) {
     A_TrayMenu.Add("📘 Open App Manual", (*) => OpenAppManual("EN"))
     A_TrayMenu.Add("⌨️ Hotkey Cheat Sheet", (*) => ShowHotkeyCheatSheet())
     A_TrayMenu.Add("ℹ️ App Information", (*) => ShowAppInformation())
+    A_TrayMenu.Add("🔍 Check for Updates", (*) => UpdateManager.CheckForUpdates(true))
     A_TrayMenu.Add()
     A_TrayMenu.Add("🔄 Reload App", (*) => Reload())
     A_TrayMenu.Add("❌ Exit App (" . exitHK . ")", RequestExitApp)

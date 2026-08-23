@@ -34,8 +34,8 @@ class DashboardManager {
         btnGlobalManual := this.hGui.Add("Button", "x310 y20 w80 h28", "📘 Manual")
         btnGlobalManual.OnEvent("Click", (*) => OpenAppManual("EN", this.hGui.Hwnd))
 
-        btnGlobalInfo := this.hGui.Add("Button", "x395 y20 w85 h28", "ℹ️ App Info")
-        btnGlobalInfo.OnEvent("Click", (*) => ShowAppInformation(this.hGui.Hwnd))
+        this.btnGlobalInfo := this.hGui.Add("Button", "x395 y20 w85 h28", "ℹ️ App Info")
+        this.btnGlobalInfo.OnEvent("Click", (*) => ShowAppInformation(this.hGui.Hwnd))
         this.hGui.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         ; Create Tab Control
@@ -62,6 +62,9 @@ class DashboardManager {
 
         this.mainTab.UseTab()
         this.mainTab.OnEvent("Change", (*) => this.OnTabChange())
+        UpdateManager.RegisterUiRefreshCallback(ObjBindMethod(this, "RefreshUpdateIndicator"))
+        UpdateManager.RegisterPreUpdateCallback(ObjBindMethod(this, "ConfirmUnsavedChanges", "update"))
+        this.RefreshUpdateIndicator()
     }
 
     OnTabChange() {
@@ -79,7 +82,15 @@ class DashboardManager {
 
     ShowGui(tabIndex) {
         this.mainTab.Choose(tabIndex)
+        this.RefreshUpdateIndicator()
         ShowCenteredOnMouse(this.hGui)
+    }
+
+    RefreshUpdateIndicator() {
+        if !this.HasOwnProp("btnGlobalInfo")
+            return
+        state := UpdateManager.GetState()
+        this.btnGlobalInfo.Text := state.Status == "available" ? "⬆ Update" : "ℹ️ App Info"
     }
 
     HasUnsavedChanges() {
@@ -122,6 +133,8 @@ class DashboardManager {
     }
 
     DiscardChanges() {
+        UpdateManager.RegisterUiRefreshCallback()
+        UpdateManager.RegisterPreUpdateCallback()
         this.hGui.Destroy()
         DashboardManager.instance := ""
     }

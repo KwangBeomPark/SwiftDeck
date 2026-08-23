@@ -12,6 +12,8 @@ test_json_out.txt
 *.tmp
 *.log
 *.lnk
+*.updater-*.exe
+*.update-*.ok
 App02_*DoNotDelete.ini
 App02_*DoNotDelete.ini.bak
 

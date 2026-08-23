@@ -3,6 +3,7 @@
 #Include Theme.ahk
 #Include FolderManager.ahk
 #Include Utils.ahk
+#Include UpdateManager.ahk
 ; Runtime global g_appVersion is initialized in SwiftDeck.ahk before this module is included.
 
 ; =================================================================================
@@ -35,11 +36,15 @@ ShowAppInformation(parentHwnd := 0) {
     promptConfigPath := GetConfigPath("Prompts")
     hotstringConfigPath := GetConfigPath("Hotstrings")
 
-    if (parentHwnd) {
+    guiOptions := "+AlwaysOnTop -MinimizeBox -MaximizeBox"
+    if (parentHwnd && WinExist("ahk_id " . parentHwnd)) {
         WinSetEnabled(0, parentHwnd)
+        guiOptions .= " +Owner" . parentHwnd
+    } else {
+        parentHwnd := 0
     }
 
-    infoGui := Gui("+AlwaysOnTop +Owner" . parentHwnd . " -MinimizeBox -MaximizeBox", "ℹ️ App Information & Support")
+    infoGui := Gui(guiOptions, "ℹ️ App Information & Support")
     ApplyTheme(infoGui, "", "") ; No header text from Theme
 
     ; Developer Info Title
@@ -57,7 +62,7 @@ ShowAppInformation(parentHwnd := 0) {
     infoGui.SetFont("s10 norm c" . THEME_TEXT, "Segoe UI")
 
     CleanUpAndClose() {
-        if (parentHwnd) {
+        if (parentHwnd && WinExist("ahk_id " . parentHwnd)) {
             WinSetEnabled(1, parentHwnd)
             WinActivate("ahk_id " . parentHwnd)
         }
@@ -89,17 +94,39 @@ ShowAppInformation(parentHwnd := 0) {
 
     ; 1. Application Overview
     infoGui.Add("GroupBox", "x20 y110 w440 h140 c" . THEME_ACCENT, "📊 Application Overview")
-    infoGui.Add("Text", "x35 y135 w190", "SwiftDeck version: " . g_appVersion)
+    infoGui.Add("Text", "x35 y135 w190", "Installed version: " . g_appVersion)
+    txtUpdateStatus := infoGui.Add("Text", "x225 y135 w220", UpdateManager.GetStatusText())
     infoGui.Add("Text", "x35 y160 w190", "📁 Favorites: " . folderCount . " registered")
     infoGui.Add("Text", "x35 y185 w190", "⌨️ Prompts: " . promptCount . " total")
     infoGui.Add("Text", "x245 y160 w190", "✏️ Hotstrings: " . hsTotal . " total")
     infoGui.SetFont("s9 c" . THEME_MUTED)
     infoGui.Add("Text", "x255 y180 w180", "(Auto: " . hsSpaceCount . " / Menu: " . hsMenuCount . ")")
     infoGui.SetFont("s10 c" . THEME_TEXT)
-    infoGui.Add("Text", "x245 y210 w190", "🔀 Key Remaps: " . remapCount . " total")
-    infoGui.SetFont("s9 c" . THEME_MUTED)
-    infoGui.Add("Text", "x35 y212 w190 h32", "Maintenance tools:`nApp Settings → General")
-    infoGui.SetFont("s10 c" . THEME_TEXT)
+    infoGui.Add("Text", "x245 y185 w190", "🔀 Key Remaps: " . remapCount . " total")
+
+    btnCheckUpdates := infoGui.Add("Button", "x35 y212 w175 h28", "🔍 Check for Updates")
+    btnUpdateNow := infoGui.Add("Button", "x220 y212 w225 h28", "⬆ Update && Restart")
+
+    RefreshUpdateControls() {
+        state := UpdateManager.GetState()
+        txtUpdateStatus.Value := UpdateManager.GetStatusText()
+        btnUpdateNow.Enabled := A_IsCompiled && state.Status == "available"
+    }
+
+    CheckUpdates(*) {
+        txtUpdateStatus.Value := "Checking GitHub…"
+        UpdateManager.CheckForUpdates(false)
+        RefreshUpdateControls()
+    }
+
+    StartUpdate(*) {
+        CleanUpAndClose()
+        SetTimer((*) => UpdateManager.BeginUpdate(), -50)
+    }
+
+    btnCheckUpdates.OnEvent("Click", CheckUpdates)
+    btnUpdateNow.OnEvent("Click", StartUpdate)
+    RefreshUpdateControls()
 
     ; 2. File Paths
     infoGui.Add("GroupBox", "x20 y260 w440 h155 c" . THEME_ACCENT, "📂 Configuration File Paths")

@@ -36,8 +36,12 @@
 
 ### 📥 일반 팀원용 원클릭 다운로드
 
-1. 깃허브 화면 우측의 **[Releases](https://github.com/KwangBeomPark/SwiftDeck/releases)** 탭으로 이동합니다.
+1. 깃허브 화면 우측의 **[Releases](https://github.com/KwangBeomPark/02_SwiftDeck/releases)** 탭으로 이동합니다.
 2. 최신 릴리즈의 **`SwiftDeck.zip`** 또는 **`SwiftDeck.exe`** 단독 실행 파일을 다운로드합니다.
+
+### 🔄 자동 업데이트
+
+SwiftDeck은 시작 후 하루에 최대 한 번 GitHub의 최신 정식 릴리스를 확인합니다. **App Information** 또는 트레이 메뉴의 **Check for Updates**에서 즉시 다시 확인할 수 있습니다. 검증된 새 버전이 있으면 **Update & Restart**가 현재 실행 파일과 같은 폴더에 `SwiftDeck.exe`를 내려받고 SHA-256을 확인한 뒤 안전하게 교체하고 재실행합니다. `%AppData%\SwiftDeck`의 저장 설정은 교체하지 않습니다. 소스 실행 모드와 읽기 전용 폴더에서는 수동 업데이트만 제공합니다.
 3. 필요한 경우 압축을 풀고 **`SwiftDeck.exe`**를 더블 클릭합니다.
 4. Windows 우측 하단 시스템 트레이에 검은색 번개 아이콘이 표시되면 바로 사용할 수 있습니다.
 

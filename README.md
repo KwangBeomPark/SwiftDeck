@@ -36,12 +36,16 @@ It is designed especially for finance, sales administration, accounting, credit 
 
 ### 📥 For General Users (1-Click Portable Download)
 
-1. Go to the **[Releases](https://github.com/KwangBeomPark/SwiftDeck/releases)** tab on the right side of the GitHub repository.
+1. Go to the **[Releases](https://github.com/KwangBeomPark/02_SwiftDeck/releases)** tab on the right side of the GitHub repository.
 2. Download the latest **`SwiftDeck.zip`** or standalone **`SwiftDeck.exe`** file.
 3. Unzip the file if needed, then double-click **`SwiftDeck.exe`**.
 4. A black lightning bolt icon will appear in the Windows system tray — SwiftDeck is ready to use.
 
 If no release file is available yet, please build or run `src/SwiftDeck.ahk` using AutoHotkey v2.
+
+### 🔄 Automatic Updates
+
+SwiftDeck checks the latest public GitHub Release after startup at most once every 24 hours. Open **App Information** or choose **Check for Updates** from the tray menu to refresh manually. When a newer verified release is available, **Update & Restart** downloads `SwiftDeck.exe` beside the currently running app, verifies its SHA-256 digest, safely replaces the executable, and restarts SwiftDeck. Saved settings in `%AppData%\SwiftDeck` are not replaced. Source mode and read-only folders remain manual-update only.
 
 ### 🛠️ For Power Users & Developers (Custom Build)
 
