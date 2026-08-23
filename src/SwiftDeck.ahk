@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 ;@Ahk2Exe-SetName SwiftDeck
-;@Ahk2Exe-SetVersion 1.3.0.0
+;@Ahk2Exe-SetVersion 1.3.1.0
 ;@Ahk2Exe-SetDescription SwiftDeck - FinOps Automation & HotKey Suite
 ;@Ahk2Exe-SetMainIcon ..\assets\SwiftDeck.ico
 
@@ -10,7 +10,7 @@
 ; =============================================================================
 
 ; [Global] Display version shown in the app UI
-global g_appVersion := "1.3.0"
+global g_appVersion := "1.3.1"
 
 ; [Global] Path configuration (migrate legacy folder name)
 if (DirExist(A_AppData . "\AHK_FolderHotKey") && !DirExist(A_AppData . "\SwiftDeck")) {
@@ -190,7 +190,7 @@ SetupTrayMenu(settings) {
     A_TrayMenu.Add()
     A_TrayMenu.Add("⚙️ App Settings", (*) => DashboardManager.Show(1))
     A_TrayMenu.Add("📁 Open Settings Folder", (*) => RunSafely("explorer.exe `"" . ConfigGetSettingsFolder() . "`"", "Open Settings Folder"))
-    A_TrayMenu.Add("📘 Open App Manual", (*) => OpenAppManual("EN"))
+    A_TrayMenu.Add("📘 Open App Manual", (*) => OpenAppManual())
     A_TrayMenu.Add("⌨️ Hotkey Cheat Sheet", (*) => ShowHotkeyCheatSheet())
     A_TrayMenu.Add("ℹ️ App Information", (*) => ShowAppInformation())
     A_TrayMenu.Add("🔍 Check for Updates", (*) => UpdateManager.CheckForUpdates(true))

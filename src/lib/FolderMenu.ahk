@@ -79,10 +79,7 @@ AddCurrentExplorerFolder() {
         return
 
     DashboardManager.Show(1)
-    if DashboardManager.instance.folderMgr.AddFolderItem(ib.Value, explorerPath) {
-        ToolTip("✅ Added. Click Save & Apply.")
-        SetTimer(() => ToolTip(), -2000)
-    }
+    DashboardManager.instance.folderMgr.AddFolderItem(ib.Value, explorerPath)
 }
 
 GetActiveExplorerPath() {

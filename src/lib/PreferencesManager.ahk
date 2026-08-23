@@ -29,7 +29,7 @@ class PreferencesManager {
     BuildUI(guiObj) {
         ; Standalone window starts lower (header takes space)
         startX := this.parentGui ? 35 : 25
-        startY := this.parentGui ? 105 : 80
+        startY := this.parentGui ? 120 : 80
 
         guiObj.SetFont("s10 c" . THEME_TEXT, "Segoe UI")
 

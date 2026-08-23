@@ -12,8 +12,6 @@ class KeyRemapManager {
     __New(parentGui := "") {
         this.parentGui := parentGui
         this.localData := ConfigReadKeyRemaps()
-        this.dirtyState := false
-
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -29,39 +27,38 @@ class KeyRemapManager {
 
     BuildUI(guiObj) {
         startX := this.parentGui ? 35 : 25
-        startY := this.parentGui ? 105 : 80
+        startY := this.parentGui ? 120 : 80
         listHeight := this.parentGui ? 290 : 345
         exampleOffset := this.parentGui ? 320 : 375
-        saveOffset := this.parentGui ? 365 : 420
+        autoSaveOffset := this.parentGui ? 370 : 425
         guiObj.SetFont("s10", "Segoe UI")
         this.mainHwnd := guiObj.Hwnd
 
         guiObj.Add("Text", "x" . startX . " y" . startY . " w400", "① Active Key Mappings:")
 
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h" . listHeight)
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w300 h" . listHeight)
 
         guiObj.SetFont("s9 c888888 norm", "Segoe UI")
         guiObj.Add("Text", "x" . startX . " y" . (startY + exampleOffset) . " w310 BackgroundTrans", "e.g.) Caps Lock → Left Click")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25", "⚠️ Reset")
+        btnReset := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY - 5) . " w95 h25", "⚠️ Reset")
         btnReset.OnEvent("Click", (*) => this.RequestReset())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
-        btnAdd := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 25) . " w85 h35", "➕ New")
-        btnEdit := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 65) . " w85 h35", "✏️ Edit")
-        btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 105) . " w85 h35", "❌ Delete")
+        btnAdd := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 25) . " w95 h35", "➕ New")
+        btnEdit := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 65) . " w95 h35", "✏️ Edit")
+        btnDel := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 105) . " w95 h35", "❌ Delete")
 
         if (!this.parentGui) {
-            btnClose := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 470) . " w85 h35", "Close")
+            btnClose := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 470) . " w95 h35", "Close")
             btnClose.OnEvent("Click", (*) => guiObj.Destroy())
         }
 
-        guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w405 h35", "💾 Save && Apply")
-        this.btnSave.OnEvent("Click", (*) => this.SaveSettings())
+        guiObj.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + autoSaveOffset) . " w405 Center", "✓ Changes are saved and applied immediately.")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         this.RefreshList()
@@ -183,10 +180,11 @@ class KeyRemapManager {
             return
 
         this.localData.RemoveAt(idx)
-        this.RefreshList(idx > this.localData.Length ? this.localData.Length : idx)
-        this.MarkDirty()
-        ToolTip("✅ Deleted. Click Save & Apply.")
-        SetTimer(() => ToolTip(), -2000)
+        targetIdx := idx > this.localData.Length ? this.localData.Length : idx
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback("✅ Mapping deleted and applied")
+        }
     }
 
     ShowEditPopup(isEdit := false, editIdx := 0) {
@@ -333,18 +331,18 @@ class KeyRemapManager {
                 this.localData.Push({ Src: src, Dst: dst })
             }
 
+            if !this.SaveSettings(false)
+                return
             this.RefreshList(isEdit ? editIdx : this.localData.Length)
-            this.MarkDirty()
             CleanUpAndClose()
-            ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            this.ShowAutoSaveFeedback(isEdit ? "✅ Mapping saved and applied" : "✅ Mapping added and applied")
         }
 
         ShowCenteredOnMouse(popup, "w480 h280")
     }
 
     IsDirty() {
-        return this.dirtyState
+        return false
     }
 
     RequestReset() {
@@ -354,24 +352,34 @@ class KeyRemapManager {
             ResetToDefaults("Key Remaps")
     }
 
-    MarkDirty() {
-        this.dirtyState := true
-        UpdateSaveButtonState(this.btnSave, true)
-    }
-
-    MarkClean() {
-        this.dirtyState := false
-        UpdateSaveButtonState(this.btnSave, false)
-    }
-
     SaveSettings(showFeedback := true) {
-        ConfigWriteKeyRemaps(this.localData)
-        LoadKeyRemaps()
-        this.MarkClean()
-        if (showFeedback) {
-            ToolTip("✅ Saved & Applied")
-            SetTimer(() => ToolTip(), -2000)
+        try {
+            ConfigWriteKeyRemaps(this.localData)
+        } catch Error as err {
+            this.localData := ConfigReadKeyRemaps()
+            this.RefreshList()
+            MsgBox("❌ The key mapping change could not be saved and was not applied.`n`nError: " . err.Message,
+                "Save Failed", 262160)
+            return false
         }
+
+        try {
+            LoadKeyRemaps()
+        } catch Error as err {
+            MsgBox("⚠️ The key mapping was saved, but the running app could not activate it.`n`n"
+                . "Reload SwiftDeck to apply the saved change.`n`nError: " . err.Message,
+                "Apply Failed", 262160)
+            return true
+        }
+
+        if showFeedback
+            this.ShowAutoSaveFeedback()
+        return true
+    }
+
+    ShowAutoSaveFeedback(message := "✅ Saved and applied") {
+        ToolTip(message)
+        SetTimer(() => ToolTip(), -2000)
     }
 }
 

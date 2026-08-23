@@ -17,8 +17,6 @@ class HotstringManager {
         hotstringData := ConfigReadHotstringData()
         this.localData := hotstringData.Data
         this.groupOrder := hotstringData.GroupOrder
-        this.dirtyState := false
-
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -34,11 +32,11 @@ class HotstringManager {
 
     BuildUI(guiObj) {
         startX := this.parentGui ? 30 : 30
-        startY := this.parentGui ? 105 : 20
+        startY := this.parentGui ? 120 : 20
         listHeight := this.parentGui ? 290 : 345
         moveUpOffset := this.parentGui ? 245 : 300
         moveDownOffset := this.parentGui ? 285 : 340
-        saveOffset := this.parentGui ? 375 : 430
+        autoSaveOffset := this.parentGui ? 380 : 435
         this.mainHwnd := guiObj.Hwnd
         if (!this.parentGui)
             guiObj.OnEvent("Close", (*) => guiObj.Destroy())
@@ -47,10 +45,10 @@ class HotstringManager {
         guiObj.Add("Text", "x" . startX . " y" . startY . " w100", "① Select Group:")
 
         guiObj.SetFont("cBlack")
-        this.cbGroup := guiObj.Add("ComboBox", "x" . (startX + 105) . " y" . (startY - 5) . " w210", [])
+        this.cbGroup := guiObj.Add("ComboBox", "x" . (startX + 105) . " y" . (startY - 5) . " w195", [])
         guiObj.SetFont("c" . THEME_TEXT)
 
-        btnManageGrp := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25", "⚙️ Groups")
+        btnManageGrp := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY - 5) . " w95 h25", "⚙️ Groups")
 
         this.txtDesc := guiObj.Add("Text", "x" . startX . " y" . (startY + 30) . " w400 c" . THEME_MUTED,
             "(Type abbreviation + ending character, e.g. Space/Enter/Tab)")
@@ -58,24 +56,24 @@ class HotstringManager {
         guiObj.Add("Text", "x" . startX . " y" . (startY + 55) . " w200", "② Abbreviation List:")
 
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 75) . " w310 h" . listHeight)
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 75) . " w300 h" . listHeight)
         guiObj.SetFont("c" . THEME_TEXT)
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 45) . " w85 h25", "⚠️ Reset")
+        btnReset := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 45) . " w95 h25", "⚠️ Reset")
         btnReset.OnEvent("Click", (*) => this.RequestReset())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
-        btnAdd := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 75) . " w85 h35", "➕ New")
-        btnEdit := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 115) . " w85 h35", "✏️ Edit")
-        btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 155) . " w85 h35", "❌ Delete")
+        btnAdd := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 75) . " w95 h35", "➕ New")
+        btnEdit := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 115) . " w95 h35", "✏️ Edit")
+        btnDel := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 155) . " w95 h35", "❌ Delete")
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
-        btnUp := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveUpOffset) . " w85 h35", "▲ Up")
-        btnDown := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveDownOffset) . " w85 h35", "▼ Down")
+        btnUp := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + moveUpOffset) . " w95 h35", "▲ Up")
+        btnDown := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + moveDownOffset) . " w95 h35", "▼ Down")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         if (!this.parentGui) {
-            btnClose := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 475) . " w85 h35", "Close")
+            btnClose := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 475) . " w95 h35", "Close")
             btnClose.OnEvent("Click", (*) => guiObj.Destroy())
         }
 
@@ -89,9 +87,8 @@ class HotstringManager {
         btnUp.OnEvent("Click", (*) => this.MoveItem(-1))
         btnDown.OnEvent("Click", (*) => this.MoveItem(1))
 
-        guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w405 h35", "💾 Save && Apply")
-        this.btnSave.OnEvent("Click", (*) => this.SaveSettings())
+        guiObj.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + autoSaveOffset) . " w405 Center", "✓ Changes are saved and applied immediately.")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         this.UpdateGroupsDdl()
@@ -189,9 +186,11 @@ class HotstringManager {
             this.UpdateGroupsDdl(groupName)
             this.RefreshList(0)
             RefreshGroupList(groupName)
-            this.MarkDirty()
-            ToolTip("✅ Group '" . groupName . "' Created. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            if !this.SaveSettings(false) {
+                RefreshGroupList()
+                return
+            }
+            this.ShowAutoSaveFeedback("✅ Group '" . groupName . "' saved")
         }
 
         btnGRename.OnEvent("Click", (*) => OnRename())
@@ -230,9 +229,11 @@ class HotstringManager {
             this.UpdateGroupsDdl(newName)
             this.RefreshList(0)
             RefreshGroupList(newName)
-            this.MarkDirty()
-            ToolTip("✅ Group Renamed. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            if !this.SaveSettings(false) {
+                RefreshGroupList()
+                return
+            }
+            this.ShowAutoSaveFeedback("✅ Group renamed and applied")
         }
 
         btnGDelete.OnEvent("Click", (*) => OnDelete())
@@ -256,9 +257,11 @@ class HotstringManager {
             this.UpdateGroupsDdl()
             this.RefreshList(0)
             RefreshGroupList()
-            this.MarkDirty()
-            ToolTip("✅ Group '" . groupName . "' Deleted. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            if !this.SaveSettings(false) {
+                RefreshGroupList()
+                return
+            }
+            this.ShowAutoSaveFeedback("✅ Group '" . groupName . "' deleted")
         }
 
         btnGUp.OnEvent("Click", (*) => OnMove(-1))
@@ -274,9 +277,13 @@ class HotstringManager {
             temp := this.groupOrder[selectedIndex]
             this.groupOrder[selectedIndex] := this.groupOrder[targetIdx]
             this.groupOrder[targetIdx] := temp
+            if !this.SaveSettings(false) {
+                RefreshGroupList()
+                return
+            }
             this.UpdateGroupsDdl(groupName)
             RefreshGroupList(groupName)
-            this.MarkDirty()
+            this.ShowAutoSaveFeedback()
         }
 
         btnGClose.OnEvent("Click", (*) => CleanUpAndClose())
@@ -394,8 +401,10 @@ class HotstringManager {
         this.localData[groupSection][idx] := this.localData[groupSection][targetIdx]
         this.localData[groupSection][targetIdx] := temp
 
-        this.RefreshList(targetIdx)
-        this.MarkDirty()
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback()
+        }
     }
 
     ShowEditPopup(isEdit := false, editIdx := 0) {
@@ -460,11 +469,11 @@ class HotstringManager {
                 this.localData[groupSection].Push({ Key: triggerText, Val: replacementText })
             }
 
+            if !this.SaveSettings(false)
+                return
             this.RefreshList(isEdit ? editIdx : this.localData[groupSection].Length)
-            this.MarkDirty()
             CleanUpAndClose()
-            ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            this.ShowAutoSaveFeedback(isEdit ? "✅ Hotstring saved and applied" : "✅ Hotstring added and applied")
         }
 
         ShowCenteredOnMouse(popup, "w430 h300")
@@ -484,14 +493,15 @@ class HotstringManager {
 
         this.localData[groupSection].RemoveAt(selectedIndex)
 
-        this.RefreshList(selectedIndex > this.localData[groupSection].Length ? this.localData[groupSection].Length : selectedIndex)
-        this.MarkDirty()
-        ToolTip("✅ Deleted. Click Save & Apply.")
-        SetTimer(() => ToolTip(), -2000)
+        targetIdx := selectedIndex > this.localData[groupSection].Length ? this.localData[groupSection].Length : selectedIndex
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback("✅ Hotstring deleted and applied")
+        }
     }
 
     IsDirty() {
-        return this.dirtyState
+        return false
     }
 
     RequestReset() {
@@ -501,24 +511,37 @@ class HotstringManager {
             ResetToDefaults("Hotstrings")
     }
 
-    MarkDirty() {
-        this.dirtyState := true
-        UpdateSaveButtonState(this.btnSave, true)
-    }
-
-    MarkClean() {
-        this.dirtyState := false
-        UpdateSaveButtonState(this.btnSave, false)
-    }
-
     SaveSettings(showFeedback := true) {
-        ConfigWriteHotstringData(this.localData, this.groupOrder)
-        LoadHotstrings()
-        BuildEmojiMenu()
-        this.MarkClean()
-        if (showFeedback) {
-            ToolTip("✅ Saved & Applied")
-            SetTimer(() => ToolTip(), -2000)
+        try {
+            ConfigWriteHotstringData(this.localData, this.groupOrder)
+        } catch Error as err {
+            hotstringData := ConfigReadHotstringData()
+            this.localData := hotstringData.Data
+            this.groupOrder := hotstringData.GroupOrder
+            this.UpdateGroupsDdl()
+            this.RefreshList()
+            MsgBox("❌ The hotstring change could not be saved and was not applied.`n`nError: " . err.Message,
+                "Save Failed", 262160)
+            return false
         }
+
+        try {
+            LoadHotstrings()
+            BuildEmojiMenu()
+        } catch Error as err {
+            MsgBox("⚠️ The hotstring change was saved, but the running app could not activate it.`n`n"
+                . "Reload SwiftDeck to apply the saved change.`n`nError: " . err.Message,
+                "Apply Failed", 262160)
+            return true
+        }
+
+        if showFeedback
+            this.ShowAutoSaveFeedback()
+        return true
+    }
+
+    ShowAutoSaveFeedback(message := "✅ Saved and applied") {
+        ToolTip(message)
+        SetTimer(() => ToolTip(), -2000)
     }
 }

@@ -2,7 +2,39 @@
 #Include Theme.ahk
 #Include Config.ahk
 #Include Utils.ahk
-OpenAppManual(lang := "EN", parentHwnd := 0) {
+
+IsSupportedManualLanguage(langCode) {
+    static supportedLanguages := Map(
+        "EN", true, "KR", true, "PL", true, "FR", true, "DE", true, "ES", true, "IT", true,
+        "GR", true, "PT", true, "CZ", true, "LV", true, "HU", true, "RO", true, "NO", true)
+    return supportedLanguages.Has(langCode)
+}
+
+GetSavedManualLanguage() {
+    savedLanguage := StrUpper(Trim(ConfigReadValue("Settings", "Settings", "ManualLanguage", "EN")))
+    return IsSupportedManualLanguage(savedLanguage) ? savedLanguage : "EN"
+}
+
+SaveManualLanguage(langCode) {
+    if !IsSupportedManualLanguage(langCode)
+        return false
+    try {
+        ConfigWriteValue("Settings", "Settings", "ManualLanguage", langCode)
+        return true
+    } catch Error as err {
+        ToolTip("⚠️ The manual language preference could not be saved.`n" . err.Message)
+        SetTimer(() => ToolTip(), -2500)
+        return false
+    }
+}
+
+OpenAppManual(lang := "", parentHwnd := 0) {
+    lang := StrUpper(Trim(lang))
+    if (lang == "")
+        lang := GetSavedManualLanguage()
+    else if !IsSupportedManualLanguage(lang)
+        lang := "EN"
+
     mGui := Gui("+AlwaysOnTop +Resize -MaximizeBox", "App Manual")
     if (parentHwnd)
         mGui.Opt("+Owner" . parentHwnd)
@@ -34,7 +66,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
                 )",
                 part2: "
                 (
-                    - App Settings: 모든 기능을 쉽고 편하게 관리`n**1. 📁 [Folders] 탭, ⌨️ [Prompts] 탭**`n    - 추가(+), 수정(✏️), 지우기(x) 버튼으로 내 입맛대로 리스트를 정리`n**2. ✏️ [Hotstrings] 탭, 🔀 [Key Remap] 탭**`n    - [Hotstrings] 탭에서 나만의 단축어 추가`n    - [Key Remap] 탭에서는 안 쓰는 키를 새롭게 맵핑`n**3. ⚙️ [General] 탭**`n    - 단축키 변경, Windows 자동 시작, 설정 폴더 열기, 백업 및 복원을 한곳에서 관리`n**4. 💾 저장과 복구**`n    - 변경 후 [Save & Apply]를 누름. 저장하지 않고 닫거나 종료하면 저장/버리기/계속 편집을 선택할 수 있음`n    - [Backup Saved]는 마지막으로 저장된 설정을 백업하므로 먼저 저장한 뒤 실행
+                    - App Settings: 모든 기능을 쉽고 편하게 관리`n**1. 📁 [Folders] 탭, ⌨️ [Prompts] 탭**`n    - 추가(+), 수정(✏️), 지우기(x) 버튼으로 내 입맛대로 리스트를 정리`n**2. ✏️ [Hotstrings] 탭, 🔀 [Key Remap] 탭**`n    - [Hotstrings] 탭에서 나만의 단축어 추가`n    - [Key Remap] 탭에서는 안 쓰는 키를 새롭게 맵핑`n**3. ⚙️ [General] 탭**`n    - 단축키 변경, Windows 자동 시작, 설정 폴더 열기, 백업 및 복원을 한곳에서 관리`n**4. 💾 저장과 복구**`n    - Folders/Prompts/Hotstrings/Key Remap 변경은 작업 확인 즉시 저장·적용`n    - 여러 단축키 값을 함께 조정하는 General만 [Save & Apply] 사용`n    - [Backup Saved]는 현재 디스크에 저장된 설정을 백업
                 )"
             }
         } else if (langCode == "PL") {
@@ -203,7 +235,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
                 )",
                 part2: "
                 (
-                    - App Settings: Manage all your features easily`n**1. 📁 [Folders] Tab, ⌨️ [Prompts] Tab**`n    - Organize your lists exactly as you want with Add (+), ✏️ Edit, and Delete (x) buttons.`n**2. ✏️ [Hotstrings] Tab, 🔀 [Key Remap] Tab**`n    - Add your custom text expansions in the [Hotstrings] tab.`n    - Remap unused keys to new functions in the [Key Remap] tab.`n**3. ⚙️ [General] Tab**`n    - Manage hotkeys, Windows startup, the settings folder, backup, and restore in one place.`n**4. 💾 Save and Recovery**`n    - Click [Save & Apply] after edits. Closing or exiting with unsaved changes offers Save All, Discard, or Keep Editing.`n    - [Backup Saved] captures the last saved settings, so save your edits first.
+                    - App Settings: Manage all your features easily`n**1. 📁 [Folders] Tab, ⌨️ [Prompts] Tab**`n    - Organize your lists exactly as you want with Add (+), ✏️ Edit, and Delete (x) buttons.`n**2. ✏️ [Hotstrings] Tab, 🔀 [Key Remap] Tab**`n    - Add your custom text expansions in the [Hotstrings] tab.`n    - Remap unused keys to new functions in the [Key Remap] tab.`n**3. ⚙️ [General] Tab**`n    - Manage hotkeys, Windows startup, the settings folder, backup, and restore in one place.`n**4. 💾 Save and Recovery**`n    - Folders, Prompts, Hotstrings, and Key Remap save and apply each confirmed action immediately.`n    - Only General uses [Save & Apply] because its hotkey values are edited together.`n    - [Backup Saved] captures the configuration currently stored on disk.
                 )"
             }
         }
@@ -275,6 +307,7 @@ OpenAppManual(lang := "EN", parentHwnd := 0) {
         langMap := Map(1, "EN", 2, "KR", 3, "PL", 4, "FR", 5, "DE", 6, "ES", 7, "IT", 8, "GR", 9, "PT", 10, "CZ", 11, "LV", 12, "HU", 13, "RO", 14, "NO")
         newLang := langMap[ddlLang.Value]
         newTexts := GetManualTexts(newLang)
+        SaveManualLanguage(newLang)
 
         doc := edtManual.Value
         doc.open()

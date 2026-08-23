@@ -331,6 +331,8 @@ ConfigRestoreFilesFromRollback(rollbackDir, sourcePaths) {
 }
 
 ResetToDefaults(target := "All") {
+    ; Manual language is a display preference, so feature/factory resets keep the user's last choice.
+    savedManualLanguage := ConfigReadValue("Settings", "Settings", "ManualLanguage", "EN")
     msg := ""
     if (target == "All")
         msg := "⚠️ Are you sure you want to FACTORY RESET ALL settings?`nAll your custom configurations will be deleted.`n(Backups will not be affected.)"
@@ -345,6 +347,8 @@ ResetToDefaults(target := "All") {
             if (target == "All" || target == fileDef.ResetTarget)
                 ConfigWriteTextFileSafely(fileDef.Path, ConfigGetDefaultText(fileDef.CanonicalName), "UTF-16")
         }
+        if (target == "All" || target == "Favorites")
+            ConfigWriteValue("Settings", "Settings", "ManualLanguage", savedManualLanguage)
         MsgBox("✅ Reset complete. The app will now reload.", "Success", 262208)
         Reload()
     } catch Error as err {
@@ -812,7 +816,8 @@ GetDefaultFolderData() {
     return "[Settings]`n"
     . "MainHotkey=F1`n"
     . "PromptModifier=#`n"
-    . "PromptUseNumpad=1`n`n"
+    . "PromptUseNumpad=1`n"
+    . "ManualLanguage=EN`n`n"
     . "[FolderMenu]`n"
     . "💾 C-Drive=C:\`n"
     . "-=-`n"

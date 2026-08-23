@@ -45,7 +45,7 @@ If no release file is available yet, please build or run `src/SwiftDeck.ahk` usi
 
 ### 🔄 Automatic Updates
 
-SwiftDeck checks the latest public GitHub Release after startup at most once every 24 hours. Open **App Information** or choose **Check for Updates** from the tray menu to refresh manually. When a newer verified release is available, **Update & Restart** downloads `SwiftDeck.exe` beside the currently running app, verifies its SHA-256 digest, safely replaces the executable, and restarts SwiftDeck. Saved settings in `%AppData%\SwiftDeck` are not replaced. Source mode and read-only folders remain manual-update only.
+SwiftDeck checks the latest public GitHub Release after startup at most once every 24 hours. When a newer release is available, **App Settings** shows `New version vX available` in its header and the header's **Update to vX** button starts the verified update directly. **App Information** and the tray menu's **Check for Updates** remain available for manual checks. The updater downloads `SwiftDeck.exe` beside the currently running app, verifies its SHA-256 digest, safely replaces the executable, and restarts SwiftDeck. Saved settings in `%AppData%\SwiftDeck` are not replaced. Source mode and read-only folders remain manual-update only.
 
 ### 🛠️ For Power Users & Developers (Custom Build)
 
@@ -84,9 +84,9 @@ Release binaries should be uploaded to GitHub Releases, not committed to the rep
 ✔ **Hotstrings**: Register text abbreviations for instant auto-completion triggered by a space or Enter key.  
 ✔ **Key Remap**: Map physical keys to more useful shortcuts or mouse clicks.  
 ✔ **General**: Manage hotkeys, Windows startup, the settings folder, saved-setting backups, restore, and factory reset.<br>
-✔ After adding, editing, or deleting items, click **Save & Apply**. Closing the settings window or exiting SwiftDeck with pending edits offers **Save All**, **Discard**, or **Keep Editing**.
+✔ Changes in **Folders**, **Prompts**, **Hotstrings**, and **Key Remap** are saved and applied immediately after each confirmed action. Only **General** keeps **Save & Apply** because its hotkey values are edited as a set. Closing or exiting with pending General changes offers **Save All**, **Discard**, or **Keep Editing**.
 
-> Open **App Settings → Manual** for the built-in guide. Its shortcut summary is generated from the settings currently active on your PC.
+> Open **App Settings → Manual** for the built-in guide. Its shortcut summary is generated from the settings currently active on your PC, and the last selected manual language is restored the next time you open it.
 
 ---
 
@@ -117,7 +117,7 @@ System Tray Menu → Open Settings Folder
 The same actions are available in **App Settings → General → Data, Startup & Recovery**:
 
 - **Open Folder** opens the local settings directory.
-- **Backup Saved** backs up the last saved configuration. Click **Save & Apply** first if the dashboard shows unsaved changes.
+- **Backup Saved** backs up the configuration currently stored on disk. If General shows pending changes, apply them first.
 - **Restore** confirms before replacing the current configuration and then reloads SwiftDeck.
 - **Factory Reset** preserves backups but replaces active settings with defaults after confirmation.
 

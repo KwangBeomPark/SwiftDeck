@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.1 — 2026-08-23
+
+### Settings UX
+
+- Folders, Prompts, Hotstrings, Key Remap의 별도 `Save & Apply` 버튼을 제거했습니다.
+- 항목 추가·수정·삭제·순서 변경과 Hotstring 그룹 변경을 성공 즉시 안전 저장하고 런타임에 적용합니다.
+- 파일 저장이 실패하면 디스크의 마지막 정상 상태를 다시 불러오고 변경이 적용되지 않았음을 안내합니다.
+- 여러 단축키 값을 함께 조정하는 General 탭만 미저장 상태와 `Save & Apply` 흐름을 유지합니다.
+
+### Update visibility
+
+- 새 릴리스가 감지되면 App Settings 헤더에 `New version vX available`을 바로 표시합니다.
+- 헤더에 `App Info`와 별도의 `Update` 버튼을 표시해, 정보 접근은 유지하면서 다운로드·검증·재시작을 바로 시작할 수 있습니다.
+
+### Layout & Manual
+
+- 각 설정 탭의 상단 여백과 우측 액션 버튼 폭을 통일해 `Reset` 등의 문구가 잘리지 않도록 조정했습니다.
+- 상단의 Manual/App Info는 기존 정렬을 유지하고, 업데이트가 있을 때만 둘 아래에 전용 `Update to vX` 버튼을 표시합니다.
+- 내장 매뉴얼은 마지막으로 선택한 언어를 저장하고 다음에 그 언어로 열립니다.
+
 ## 1.3.0 — 2026-08-23
 
 ### Automatic updates

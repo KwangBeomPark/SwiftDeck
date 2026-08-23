@@ -26,20 +26,27 @@ class DashboardManager {
 
     __New() {
         this.hGui := Gui("+AlwaysOnTop +OwnDialogs", "SwiftDeck App Settings")
-        ApplyTheme(this.hGui, "SwiftDeck", "v" . g_appVersion . " | FinOps Automation && HotKey Suite")
+        ApplyTheme(this.hGui, "SwiftDeck", "")
         this.hGui.OnEvent("Close", ObjBindMethod(this, "HandleClose"))
 
-        ; Add top-right global buttons (Manual & Info)
+        this.hGui.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+        this.txtHeaderStatus := this.hGui.Add("Text", "x20 y40 w280 h20 BackgroundTrans",
+            "v" . g_appVersion . " | FinOps Automation && HotKey Suite")
+
+        ; Add top-right global actions. Update stays hidden until a newer release is detected.
         this.hGui.SetFont("s9 cCCCCCC norm", "Segoe UI")
         btnGlobalManual := this.hGui.Add("Button", "x310 y20 w80 h28", "📘 Manual")
-        btnGlobalManual.OnEvent("Click", (*) => OpenAppManual("EN", this.hGui.Hwnd))
+        btnGlobalManual.OnEvent("Click", (*) => OpenAppManual("", this.hGui.Hwnd))
 
         this.btnGlobalInfo := this.hGui.Add("Button", "x395 y20 w85 h28", "ℹ️ App Info")
         this.btnGlobalInfo.OnEvent("Click", (*) => ShowAppInformation(this.hGui.Hwnd))
+
+        this.btnGlobalUpdate := this.hGui.Add("Button", "x310 y50 w170 h22 Hidden", "⬆ Update")
+        this.btnGlobalUpdate.OnEvent("Click", ObjBindMethod(this, "HandleUpdateAction"))
         this.hGui.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         ; Create Tab Control
-        this.mainTab := this.hGui.Add("Tab3", "x20 y75 w460 h465", ["📁 Folders", "⌨️ Prompts", "✏️ Hotstrings", "🔀 Key Remap", "⚙️ General"])
+        this.mainTab := this.hGui.Add("Tab3", "x20 y80 w460 h465", ["📁 Folders", "⌨️ Prompts", "✏️ Hotstrings", "🔀 Key Remap", "⚙️ General"])
 
         this.mainTab.UseTab(1)
         this.folderMgr := FolderManager(this.hGui)
@@ -82,23 +89,33 @@ class DashboardManager {
 
     ShowGui(tabIndex) {
         this.mainTab.Choose(tabIndex)
+        this.OnTabChange()
         this.RefreshUpdateIndicator()
         ShowCenteredOnMouse(this.hGui)
     }
 
     RefreshUpdateIndicator() {
-        if !this.HasOwnProp("btnGlobalInfo")
+        if !this.HasOwnProp("btnGlobalUpdate") || !this.HasOwnProp("txtHeaderStatus")
             return
         state := UpdateManager.GetState()
-        this.btnGlobalInfo.Text := state.Status == "available" ? "⬆ Update" : "ℹ️ App Info"
+        if (state.Status == "available") {
+            this.txtHeaderStatus.Text := "⬆ New version v" . state.LatestVersion . " available"
+            this.txtHeaderStatus.SetFont("s9 cFFCC66 bold", "Segoe UI")
+            this.btnGlobalUpdate.Text := "⬆ Update to v" . state.LatestVersion
+            this.btnGlobalUpdate.Visible := true
+        } else {
+            this.txtHeaderStatus.Text := "v" . g_appVersion . " | FinOps Automation && HotKey Suite"
+            this.txtHeaderStatus.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+            this.btnGlobalUpdate.Visible := false
+        }
+    }
+
+    HandleUpdateAction(*) {
+        SetTimer((*) => UpdateManager.BeginUpdate(), -50)
     }
 
     HasUnsavedChanges() {
-        return this.folderMgr.IsDirty()
-            || this.promptMgr.IsDirty()
-            || this.hotstringMgr.IsDirty()
-            || this.keyRemapMgr.IsDirty()
-            || this.prefMgr.IsDirty()
+        return this.prefMgr.IsDirty()
     }
 
     SaveAllChanges(reloadForGeneral := true, showFeedback := true) {
@@ -106,14 +123,6 @@ class DashboardManager {
         try {
             if (generalWasDirty && !this.prefMgr.TrySavePreferences(false, false))
                 return false
-            if (this.folderMgr.IsDirty())
-                this.folderMgr.SaveSettings(false)
-            if (this.promptMgr.IsDirty())
-                this.promptMgr.SaveSettings(false)
-            if (this.hotstringMgr.IsDirty())
-                this.hotstringMgr.SaveSettings(false)
-            if (this.keyRemapMgr.IsDirty())
-                this.keyRemapMgr.SaveSettings(false)
         } catch Error as err {
             MsgBox("❌ Could not save all settings.`n`nError: " . err.Message, "Save Failed", 262160)
             return false

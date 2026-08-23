@@ -634,7 +634,7 @@ class UpdateManager {
         if (lastNotified == version)
             return
 
-        TrayTip("Open App Information to review and install it.", "⬆ SwiftDeck v" . version . " is available", "Iconi")
+        TrayTip("Open App Settings and select Update to install it.", "⬆ SwiftDeck v" . version . " is available", "Iconi")
         SetTimer((*) => TrayTip(), -5000)
         try IniWrite(version, statePath, "Update", "LastNotifiedVersion")
     }

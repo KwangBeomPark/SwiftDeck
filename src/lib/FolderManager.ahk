@@ -20,7 +20,6 @@ class FolderManager {
     __New(parentGui := "") {
         this.orderedItems := FolderManager.ReadFolderItems()
         this.parentGui := parentGui
-        this.dirtyState := false
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -37,43 +36,43 @@ class FolderManager {
     BuildUI(guiObj) {
         this.mainHwnd := guiObj.Hwnd
         startX := this.parentGui ? 35 : 25
-        startY := this.parentGui ? 105 : 80
+        startY := this.parentGui ? 120 : 80
         listHeight := this.parentGui ? 300 : 345
         moveUpOffset := this.parentGui ? 245 : 290
         moveDownOffset := this.parentGui ? 285 : 330
-        saveOffset := this.parentGui ? 340 : 385
-        hintOffset := this.parentGui ? 390 : 435
+        autoSaveOffset := this.parentGui ? 345 : 390
+        hintOffset := this.parentGui ? 375 : 435
         guiObj.SetFont("s10", "Segoe UI")
 
         guiObj.Add("Text", "x" . startX . " y" . startY . " w400", "Saved Folders:")
 
         ; Set ListBox text color to black (for readability on white background)
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w310 h" . listHeight)
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 25) . " w300 h" . listHeight)
         guiObj.SetFont("c" . THEME_TEXT)
 
-        btnAddDir := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 25) . " w85 h35", "➕ New")
-        btnEdit := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 65) . " w85 h35", "✏️ Edit")
-        btnSep := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 105) . " w85 h35", "➖ Separator")
-        btnDel := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 145) . " w85 h35", "❌ Delete")
+        btnAddDir := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 25) . " w95 h35", "➕ New")
+        btnEdit := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 65) . " w95 h35", "✏️ Edit")
+        btnSep := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 105) . " w95 h35", "➖ Separator")
+        btnDel := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 145) . " w95 h35", "❌ Delete")
 
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
-        btnUp := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveUpOffset) . " w85 h35", "▲ Up")
-        btnDown := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + moveDownOffset) . " w85 h35", "▼ Down")
+        btnUp := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + moveUpOffset) . " w95 h35", "▲ Up")
+        btnDown := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + moveDownOffset) . " w95 h35", "▼ Down")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY - 5) . " w85 h25", "⚠️ Reset")
+        btnReset := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY - 5) . " w95 h25", "⚠️ Reset")
         btnReset.OnEvent("Click", (*) => this.RequestReset())
 
-        guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w405 h40", "💾 Save && Apply")
-        guiObj.SetFont("c" . THEME_TEXT . " norm", "Segoe UI")
+        guiObj.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + autoSaveOffset) . " w405 Center", "✓ Changes are saved and applied immediately.")
+        guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         guiObj.Add("Text", "x" . startX . " y" . (startY + hintOffset) . " w405 c" . THEME_MUTED . " Center", "💡 Press the Folder Menu Hotkey (default: F1) anywhere to open this menu.")
 
         if (!this.parentGui) {
-            btnClose := guiObj.Add("Button", "x" . (startX + 320) . " y" . (startY + 465) . " w85 h35", "Close")
+            btnClose := guiObj.Add("Button", "x" . (startX + 310) . " y" . (startY + 465) . " w95 h35", "Close")
             btnClose.OnEvent("Click", (*) => guiObj.Destroy())
         }
 
@@ -86,7 +85,6 @@ class FolderManager {
         btnDel.OnEvent("Click", (*) => this.DeleteItem())
         btnUp.OnEvent("Click", (*) => this.MoveItem(-1))
         btnDown.OnEvent("Click", (*) => this.MoveItem(1))
-        this.btnSave.OnEvent("Click", (*) => this.SaveAndClose(guiObj))
     }
 
     RefreshList(targetIdx := 0) {
@@ -120,8 +118,10 @@ class FolderManager {
         this.orderedItems[idx] := this.orderedItems[targetIdx]
         this.orderedItems[targetIdx] := temp
 
-        this.RefreshList(targetIdx)
-        this.MarkDirty()
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback()
+        }
     }
 
     DeleteItem() {
@@ -136,14 +136,19 @@ class FolderManager {
             return
 
         this.orderedItems.RemoveAt(idx)
-        this.RefreshList(idx > this.orderedItems.Length ? this.orderedItems.Length : idx)
-        this.MarkDirty()
+        targetIdx := idx > this.orderedItems.Length ? this.orderedItems.Length : idx
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback("✅ Deleted and applied")
+        }
     }
 
     AddSeparator() {
         this.orderedItems.Push({ Name: "-", Path: "-" })
-        this.RefreshList(this.orderedItems.Length)
-        this.MarkDirty()
+        if this.SaveSettings(false) {
+            this.RefreshList(this.orderedItems.Length)
+            this.ShowAutoSaveFeedback("✅ Separator added")
+        }
     }
 
     AddFolderItem(folderName, folderPath) {
@@ -153,8 +158,10 @@ class FolderManager {
             return false
         }
         this.orderedItems.Push({ Name: folderName, Path: folderPath })
+        if !this.SaveSettings(false)
+            return false
         this.RefreshList(this.orderedItems.Length)
-        this.MarkDirty()
+        this.ShowAutoSaveFeedback("✅ Folder added")
         return true
     }
 
@@ -220,11 +227,11 @@ class FolderManager {
             this.orderedItems[idx].Name := n
             this.orderedItems[idx].Path := p
 
+            if !this.SaveSettings(false)
+                return
             this.RefreshList(idx)
-            this.MarkDirty()
             CleanUpAndClose()
-            ToolTip("✅ Modified. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            this.ShowAutoSaveFeedback("✅ Folder saved and applied")
         }
 
         ShowCenteredOnMouse(popup, "w430 h250")
@@ -277,14 +284,8 @@ class FolderManager {
         this.AddFolderItem(ib.Value, selectedDir)
     }
 
-    SaveAndClose(guiObj) {
-        this.SaveSettings()
-        if (!this.parentGui)
-            guiObj.Destroy()
-    }
-
     IsDirty() {
-        return this.dirtyState
+        return false
     }
 
     RequestReset() {
@@ -294,22 +295,23 @@ class FolderManager {
             ResetToDefaults("Favorites")
     }
 
-    MarkDirty() {
-        this.dirtyState := true
-        UpdateSaveButtonState(this.btnSave, true)
-    }
-
-    MarkClean() {
-        this.dirtyState := false
-        UpdateSaveButtonState(this.btnSave, false)
-    }
-
     SaveSettings(showFeedback := true) {
-        FolderManager.WriteFolderItems(this.orderedItems)
-        this.MarkClean()
-        if (showFeedback) {
-            ToolTip("✅ Saved successfully")
-            SetTimer(() => ToolTip(), -2000)
+        try {
+            FolderManager.WriteFolderItems(this.orderedItems)
+            if showFeedback
+                this.ShowAutoSaveFeedback()
+            return true
+        } catch Error as err {
+            this.orderedItems := FolderManager.ReadFolderItems()
+            this.RefreshList()
+            MsgBox("❌ The folder change could not be saved and was not applied.`n`nError: " . err.Message,
+                "Save Failed", 262160)
+            return false
         }
+    }
+
+    ShowAutoSaveFeedback(message := "✅ Saved and applied") {
+        ToolTip(message)
+        SetTimer(() => ToolTip(), -2000)
     }
 }

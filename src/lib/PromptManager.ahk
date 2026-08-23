@@ -84,7 +84,6 @@ class PromptManager {
     __New(parentGui := "") {
         this.parentGui := parentGui
         this.localData := ConfigReadPromptData()
-        this.dirtyState := false
         if (parentGui)
             this.BuildUI(parentGui)
     }
@@ -100,11 +99,11 @@ class PromptManager {
 
     BuildUI(guiObj) {
         startX := this.parentGui ? 30 : 30
-        startY := this.parentGui ? 105 : 20
+        startY := this.parentGui ? 120 : 20
         listHeight := this.parentGui ? 165 : 210
         previewLabelOffset := this.parentGui ? 230 : 275
         previewEditOffset := this.parentGui ? 250 : 295
-        saveOffset := this.parentGui ? 365 : 410
+        autoSaveOffset := this.parentGui ? 370 : 415
         this.mainHwnd := guiObj.Hwnd
         if (!this.parentGui)
             guiObj.OnEvent("Close", (*) => guiObj.Destroy())
@@ -130,7 +129,7 @@ class PromptManager {
         guiObj.Add("Text", "x" . startX . " y" . (startY + 35) . " w200", "② Prompts in this Slot:")
 
         guiObj.SetFont("cBlack")
-        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 55) . " w320 h" . listHeight)
+        this.lbItems := guiObj.Add("ListBox", "x" . startX . " y" . (startY + 55) . " w295 h" . listHeight)
         guiObj.SetFont("c" . THEME_TEXT)
 
         guiObj.Add("Text", "x" . startX . " y" . (startY + previewLabelOffset) . " w200", "③ Content Preview:")
@@ -140,20 +139,20 @@ class PromptManager {
         guiObj.SetFont("c" . THEME_TEXT)
 
         guiObj.SetFont("s9 cD03A3A norm", "Segoe UI")
-        btnReset := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 25) . " w70 h25", "⚠️ Reset")
+        btnReset := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 25) . " w95 h25", "⚠️ Reset")
         btnReset.OnEvent("Click", (*) => this.RequestReset())
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
-        btnNew := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 55) . " w70 h35", "➕ New")
-        btnEdit := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 95) . " w70 h35", "✏️ Edit")
-        btnDel := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 135) . " w70 h35", "❌ Delete")
+        btnNew := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 55) . " w95 h35", "➕ New")
+        btnEdit := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 95) . " w95 h35", "✏️ Edit")
+        btnDel := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 135) . " w95 h35", "❌ Delete")
         guiObj.SetFont("s9 cWhite norm", "Segoe UI")
-        btnUp := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 175) . " w70 h35", "▲ Up")
-        btnDown := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 215) . " w70 h35", "▼ Down")
+        btnUp := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 175) . " w95 h35", "▲ Up")
+        btnDown := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 215) . " w95 h35", "▼ Down")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         if (!this.parentGui) {
-            btnClose := guiObj.Add("Button", "x" . (startX + 330) . " y" . (startY + 455) . " w70 h35", "Close")
+            btnClose := guiObj.Add("Button", "x" . (startX + 305) . " y" . (startY + 455) . " w95 h35", "Close")
             btnClose.OnEvent("Click", (*) => guiObj.Destroy())
         }
 
@@ -166,9 +165,8 @@ class PromptManager {
         btnUp.OnEvent("Click", (*) => this.MoveItem(-1))
         btnDown.OnEvent("Click", (*) => this.MoveItem(1))
 
-        guiObj.SetFont("s10 cWhite bold", "Segoe UI")
-        this.btnSave := guiObj.Add("Button", "x" . startX . " y" . (startY + saveOffset) . " w400 h35", "💾 Save && Apply")
-        this.btnSave.OnEvent("Click", (*) => this.SaveSettings())
+        guiObj.SetFont("s9 c" . THEME_MUTED . " norm", "Segoe UI")
+        guiObj.Add("Text", "x" . startX . " y" . (startY + autoSaveOffset) . " w400 Center", "✓ Changes are saved and applied immediately.")
         guiObj.SetFont("s10 c" . THEME_TEXT . " norm", "Segoe UI")
 
         this.RefreshList()
@@ -312,11 +310,11 @@ class PromptManager {
                 this.localData[currNum].Push({ Title: t, Msg: m })
             }
 
+            if !this.SaveSettings(false)
+                return
             this.RefreshList(isEdit ? editIdx : this.localData[currNum].Length)
-            this.MarkDirty()
             CleanUpAndClose()
-            ToolTip(isEdit ? "✅ Modified. Click Save & Apply." : "✅ Added. Click Save & Apply.")
-            SetTimer(() => ToolTip(), -2000)
+            this.ShowAutoSaveFeedback(isEdit ? "✅ Prompt saved and applied" : "✅ Prompt added and applied")
         }
 
         ShowCenteredOnMouse(popup, "w430 h280")
@@ -371,8 +369,10 @@ class PromptManager {
         this.localData[currNum][idx] := this.localData[currNum][targetIdx]
         this.localData[currNum][targetIdx] := temp
 
-        this.RefreshList(targetIdx)
-        this.MarkDirty()
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback()
+        }
     }
 
     DeleteItem() {
@@ -389,14 +389,15 @@ class PromptManager {
 
         this.localData[currNum].RemoveAt(selIdx)
 
-        this.RefreshList(selIdx > this.localData[currNum].Length ? this.localData[currNum].Length : selIdx)
-        this.MarkDirty()
-        ToolTip("✅ Deleted. Click Save & Apply.")
-        SetTimer(() => ToolTip(), -2000)
+        targetIdx := selIdx > this.localData[currNum].Length ? this.localData[currNum].Length : selIdx
+        if this.SaveSettings(false) {
+            this.RefreshList(targetIdx)
+            this.ShowAutoSaveFeedback("✅ Prompt deleted and applied")
+        }
     }
 
     IsDirty() {
-        return this.dirtyState
+        return false
     }
 
     RequestReset() {
@@ -406,23 +407,24 @@ class PromptManager {
             ResetToDefaults("Prompts")
     }
 
-    MarkDirty() {
-        this.dirtyState := true
-        UpdateSaveButtonState(this.btnSave, true)
-    }
-
-    MarkClean() {
-        this.dirtyState := false
-        UpdateSaveButtonState(this.btnSave, false)
-    }
-
     SaveSettings(showFeedback := true) {
-        ConfigWritePromptData(this.localData)
-        this.MarkClean()
-        if (showFeedback) {
-            ToolTip("✅ Saved & Applied")
-            SetTimer(() => ToolTip(), -2000)
+        try {
+            ConfigWritePromptData(this.localData)
+            if showFeedback
+                this.ShowAutoSaveFeedback()
+            return true
+        } catch Error as err {
+            this.localData := ConfigReadPromptData()
+            this.RefreshList()
+            MsgBox("❌ The prompt change could not be saved and was not applied.`n`nError: " . err.Message,
+                "Save Failed", 262160)
+            return false
         }
+    }
+
+    ShowAutoSaveFeedback(message := "✅ Saved and applied") {
+        ToolTip(message)
+        SetTimer(() => ToolTip(), -2000)
     }
 }
 
